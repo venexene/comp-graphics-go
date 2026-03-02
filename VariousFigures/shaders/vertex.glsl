@@ -16,8 +16,7 @@ void main()
 {
     gl_Position = projection * view * model * vec4(aPos, 1.0);
     
-    // Сохраняем позицию в мировых координатах для паттернов
-    vPosition = vec3(model * vec4(aPos, 1.0));
+    vPosition = aPos;   // локальные координаты!
     
     ourColor = aColor;
     TexCoord = aTexCoord;
