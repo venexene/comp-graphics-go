@@ -9,10 +9,13 @@ uniform struct Transform {
     mat4 view;
     mat4 projection;
     mat3 normal_mat;
+    vec3 view_pos;
 } transform;
 
 uniform struct PointLight {
+    vec3 ambient;
     vec3 diffuse;
+    vec3 specular;
     vec3 position;
 
     float constant;

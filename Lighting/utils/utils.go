@@ -9,9 +9,47 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/venexene/comp-graphics-go/objects"
+	"github.com/venexene/comp-graphics-go/shaders"
 )
 
 var startTime = time.Now()
+
+var (
+	lastTKeyState = false
+	lastGKeyState = false
+	lastYKeyState = false
+)
+
+var (
+	defaultTexture    uint32
+	lightPosition     = mgl32.Vec3{2.0, 4.0, 3.0}
+	lightConstant     float32 = 1.0
+	lightLinear       float32 = 0.09
+	lightQuadratic    float32 = 0.032
+	lightLinearCoef   float32 = 0.5
+	lightQuadraticCoef float32 = 0.5
+	ambientStrength   float32 = 0.6
+)
+
+// CreateWhiteTexture creates a simple 1x1 white texture for the default material
+func CreateWhiteTexture() uint32 {
+	var texture uint32
+	gl.GenTextures(1, &texture)
+	gl.BindTexture(gl.TEXTURE_2D, texture)
+
+	// Create a simple 1x1 white pixel
+	whitePixel := []uint8{255, 255, 255, 255}
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(whitePixel))
+
+	// Set texture parameters
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	return texture
+}
 
 // Структура для хранения состояния камеры
 type Camera struct {
@@ -31,21 +69,14 @@ type ObjectState struct {
 }
 
 var (
-	camera = Camera{
-		Target:   mgl32.Vec3{0.0, 0.0, 0.0},
-		Distance: 5.0,
-		Yaw:      0.0,
-		Pitch:    0.0,
-	}
-
-	objectState = ObjectState{
-		Position:  mgl32.Vec3{0.0, 0.0, 0.0},
-		Scale:     1.0,
-		RotationX: 0.0,
-		RotationY: 0.0,
-		RotationZ: 0.0,
-	}
+	camera      = Camera{Target: mgl32.Vec3{0, 0, 0}, Distance: 5.0, Yaw: 0.0, Pitch: 0.0}
+	objectState = ObjectState{Position: mgl32.Vec3{0, 0, 0}, Scale: 1.0, RotationX: 0.0, RotationY: 0.0, RotationZ: 0.0}
 )
+
+// InitScene initializes the rendering scene (textures, etc)
+func InitScene() {
+	defaultTexture = CreateWhiteTexture()
+}
 
 // Обработка нажатий клавиш
 func ProcessInput(window *glfw.Window) {
@@ -152,6 +183,58 @@ func ProcessInput(window *glfw.Window) {
 		objectState.RotationZ -= 0.001
 	}
 
+	// Переключение модели освещения и режима затенения
+	currentTKeyState := window.GetKey(glfw.KeyT) == glfw.Press
+	currentGKeyState := window.GetKey(glfw.KeyG) == glfw.Press
+	currentYKeyState := window.GetKey(glfw.KeyY) == glfw.Press
+
+	if currentTKeyState && !lastTKeyState {
+		shaders.CycleLightingVariant(true)
+	}
+	if currentGKeyState && !lastGKeyState {
+		shaders.CycleLightingVariant(false)
+	}
+	if currentYKeyState && !lastYKeyState {
+		shaders.ToggleShadingMode()
+	}
+
+	lastTKeyState = currentTKeyState
+	lastGKeyState = currentGKeyState
+	lastYKeyState = currentYKeyState
+
+	// Уровни затухания света
+	if window.GetKey(glfw.KeyZ) == glfw.Press {
+		lightLinearCoef -= 0.01
+		if lightLinearCoef < 0.0 {
+			lightLinearCoef = 0.0
+		}
+	}
+	if window.GetKey(glfw.KeyX) == glfw.Press {
+		lightLinearCoef += 0.01
+	}
+	if window.GetKey(glfw.KeyC) == glfw.Press {
+		lightQuadraticCoef -= 0.01
+		if lightQuadraticCoef < 0.0 {
+			lightQuadraticCoef = 0.0
+		}
+	}
+	if window.GetKey(glfw.KeyV) == glfw.Press {
+		lightQuadraticCoef += 0.01
+	}
+
+	// Фоновый свет
+	if window.GetKey(glfw.KeyB) == glfw.Press {
+		ambientStrength -= 0.01
+		if ambientStrength < 0.0 {
+			ambientStrength = 0.0
+		}
+	}
+	if window.GetKey(glfw.KeyN) == glfw.Press {
+		ambientStrength += 0.01
+		if ambientStrength > 1.0 {
+			ambientStrength = 1.0
+		}
+	}
 
 	// Приближение/отдаление камеры
 	if window.GetKey(glfw.KeyKPAdd) == glfw.Press || window.GetKey(glfw.KeyEqual) == glfw.Press {
@@ -183,7 +266,7 @@ func ProcessInput(window *glfw.Window) {
 }
 
 // Рендеринг
-func DrawScene(window *glfw.Window, program uint32, model *objects.Model, view, projection mgl32.Mat4) {
+func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32.Mat4) {
 	// Обработка ввода
 	ProcessInput(window)
 
@@ -191,12 +274,31 @@ func DrawScene(window *glfw.Window, program uint32, model *objects.Model, view, 
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
+	// Получить текущую программу освещения
+	program := shaders.GetCurrentLightingProgram()
 	gl.UseProgram(program)
 
 	// Получение uniform-переменных
-	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
-	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
-	projUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
+	modelUniform := gl.GetUniformLocation(program, gl.Str("transform.model\x00"))
+	viewUniform := gl.GetUniformLocation(program, gl.Str("transform.view\x00"))
+	projUniform := gl.GetUniformLocation(program, gl.Str("transform.projection\x00"))
+	normalUniform := gl.GetUniformLocation(program, gl.Str("transform.normal_mat\x00"))
+	viewPosUniform := gl.GetUniformLocation(program, gl.Str("transform.view_pos\x00"))
+	materialAmbientUniform := gl.GetUniformLocation(program, gl.Str("material.ambient\x00"))
+	materialDiffuseUniform := gl.GetUniformLocation(program, gl.Str("material.diffuse\x00"))
+	materialSpecularUniform := gl.GetUniformLocation(program, gl.Str("material.specular\x00"))
+	materialSheenUniform := gl.GetUniformLocation(program, gl.Str("material.sheen_coef\x00"))
+	lightAmbientUniform := gl.GetUniformLocation(program, gl.Str("light.ambient\x00"))
+	lightDiffuseUniform := gl.GetUniformLocation(program, gl.Str("light.diffuse\x00"))
+	lightSpecularUniform := gl.GetUniformLocation(program, gl.Str("light.specular\x00"))
+	lightPositionUniform := gl.GetUniformLocation(program, gl.Str("light.position\x00"))
+	lightConstantUniform := gl.GetUniformLocation(program, gl.Str("light.constant\x00"))
+	lightLinearUniform := gl.GetUniformLocation(program, gl.Str("light.linear\x00"))
+	lightQuadraticUniform := gl.GetUniformLocation(program, gl.Str("light.quadratic\x00"))
+	lightAmbientStrengthUniform := gl.GetUniformLocation(program, gl.Str("light.ambient_strength\x00"))
+	linearCoefUniform := gl.GetUniformLocation(program, gl.Str("linear_coef\x00"))
+	quadraticCoefUniform := gl.GetUniformLocation(program, gl.Str("quadratic_coef\x00"))
+	diffuseMapUniform := gl.GetUniformLocation(program, gl.Str("diffuse_map\x00"))
 
 	// Вычисление позиции камеры на основе сферических координат
 	x := camera.Distance * float32(math.Cos(float64(camera.Yaw))) * float32(math.Cos(float64(camera.Pitch)))
@@ -215,6 +317,9 @@ func DrawScene(window *glfw.Window, program uint32, model *objects.Model, view, 
 	// Передача матриц в шейдеры
 	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
 	gl.UniformMatrix4fv(projUniform, 1, false, &projection[0])
+	if viewPosUniform != -1 {
+		gl.Uniform3f(viewPosUniform, cameraPosition.X(), cameraPosition.Y(), cameraPosition.Z())
+	}
 
 	// СОЗДАНИЕ МАТРИЦЫ МОДЕЛИ
 	scale := mgl32.Scale3D(objectState.Scale, objectState.Scale, objectState.Scale)
@@ -229,7 +334,68 @@ func DrawScene(window *glfw.Window, program uint32, model *objects.Model, view, 
 	modelMat := translation.Mul4(rotationZ.Mul4(scale))
 
 	// Используем только цвет
-	gl.UniformMatrix4fv(modelUniform, 1, false, &modelMat[0])
+	if modelUniform != -1 {
+		gl.UniformMatrix4fv(modelUniform, 1, false, &modelMat[0])
+	}
+	if normalUniform != -1 {
+		// Extract the upper-left 3x3 and compute the normal matrix
+		m := modelMat.Inv().Transpose()
+		normalMat := mgl32.Mat3{
+			m[0], m[1], m[2],
+			m[4], m[5], m[6],
+			m[8], m[9], m[10],
+		}
+		gl.UniformMatrix3fv(normalUniform, 1, false, &normalMat[0])
+	}
+
+	if materialAmbientUniform != -1 {
+		gl.Uniform3f(materialAmbientUniform, 0.2, 0.2, 0.2)
+	}
+	if materialDiffuseUniform != -1 {
+		gl.Uniform3f(materialDiffuseUniform, 1.0, 1.0, 1.0)
+	}
+	if materialSpecularUniform != -1 {
+		gl.Uniform3f(materialSpecularUniform, 1.0, 1.0, 1.0)
+	}
+	if materialSheenUniform != -1 {
+		gl.Uniform1f(materialSheenUniform, 32.0)
+	}
+	if lightAmbientUniform != -1 {
+		gl.Uniform3f(lightAmbientUniform, 0.2, 0.2, 0.2)
+	}
+	if lightDiffuseUniform != -1 {
+		gl.Uniform3f(lightDiffuseUniform, 1.0, 1.0, 1.0)
+	}
+	if lightSpecularUniform != -1 {
+		gl.Uniform3f(lightSpecularUniform, 1.0, 1.0, 1.0)
+	}
+	if lightPositionUniform != -1 {
+		gl.Uniform3f(lightPositionUniform, lightPosition.X(), lightPosition.Y(), lightPosition.Z())
+	}
+	if lightConstantUniform != -1 {
+		gl.Uniform1f(lightConstantUniform, lightConstant)
+	}
+	if lightLinearUniform != -1 {
+		gl.Uniform1f(lightLinearUniform, lightLinear)
+	}
+	if lightQuadraticUniform != -1 {
+		gl.Uniform1f(lightQuadraticUniform, lightQuadratic)
+	}
+	if lightAmbientStrengthUniform != -1 {
+		gl.Uniform1f(lightAmbientStrengthUniform, ambientStrength)
+	}
+	if linearCoefUniform != -1 {
+		gl.Uniform1f(linearCoefUniform, lightLinearCoef)
+	}
+	if quadraticCoefUniform != -1 {
+		gl.Uniform1f(quadraticCoefUniform, lightQuadraticCoef)
+	}
+	if diffuseMapUniform != -1 {
+		gl.Uniform1i(diffuseMapUniform, 0)
+	}
+
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, defaultTexture)
 
 	// Отрисовка загруженной модели
 	model.Draw()

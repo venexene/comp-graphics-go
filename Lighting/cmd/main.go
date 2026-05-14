@@ -27,7 +27,14 @@ func main() {
 	window := initGlfw()
 	defer glfw.Terminate()
 
-	program := initOpenGL()
+	err := initOpenGL()
+	if err != nil {
+		panic(err)
+	}
+	defer shaders.CleanupLightingVariants()
+
+	// Initialize scene (textures, etc)
+	utils.InitScene()
 
 	objPath := "models/snowman.obj"
 	if len(os.Args) > 1 {
@@ -50,10 +57,19 @@ func main() {
 	projection := mgl32.Perspective(mgl32.DegToRad(45.0), float32(width)/height, 0.1, 100.0)
 
 	fmt.Println("OBJ model loaded:", objPath)
+	fmt.Println("Lighting variants loaded:", shaders.GetLightingVariantCount())
+	fmt.Println("Controls:")
+	fmt.Println("  T/G: Next/Previous lighting variant")
+	fmt.Println("  Arrow keys: Rotate camera")
+	fmt.Println("  WASD: Pan camera")
+	fmt.Println("  +/-: Zoom")
+	fmt.Println("  Q/E: Scale object")
+	fmt.Println("  IJKL/U/O: Move object")
+	fmt.Println("  Ctrl+R: Reset")
 
 	// Основной цикл рендеринга
 	for !window.ShouldClose() {
-		utils.DrawScene(window, program, model, view, projection)
+		utils.DrawScene(window, model, view, projection)
 	}
 }
 
@@ -79,52 +95,17 @@ func initGlfw() *glfw.Window {
 }
 
 // Инициализация OpenGL
-func initOpenGL() uint32 {
+func initOpenGL() error {
     if err := gl.Init(); err != nil {
-        panic(err)
-    }
-
-    vertexShaderSource, err := shaders.LoadShaderFile("shaders/vertex.glsl")
-    if err != nil {
-        panic(err)
-    }
-
-    fragmentShaderSource, err := shaders.LoadShaderFile("shaders/fragment.glsl")
-    if err != nil {
-        panic(err)
+        return err
     }
 
     version := gl.GoStr(gl.GetString(gl.VERSION))
     log.Println("OpenGL version", version)
 
-    vertexShader, err := shaders.CompileShader(vertexShaderSource, gl.VERTEX_SHADER)
-    if err != nil {
-        panic(err)
+    if err := shaders.InitLightingVariants(); err != nil {
+        return err
     }
 
-    fragmentShader, err := shaders.CompileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-    if err != nil {
-        panic(err)
-    }
-
-    program := gl.CreateProgram()
-    gl.AttachShader(program, vertexShader)
-    gl.AttachShader(program, fragmentShader)
-    gl.LinkProgram(program)
-
-    var status int32
-    gl.GetProgramiv(program, gl.LINK_STATUS, &status)
-    if status == gl.FALSE {
-        var logLength int32
-        gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
-
-        log := make([]byte, logLength)
-        gl.GetProgramInfoLog(program, logLength, nil, &log[0])
-        panic(fmt.Sprintf("Failed to link program: %s", string(log)))
-    }
-
-    gl.DeleteShader(vertexShader)
-    gl.DeleteShader(fragmentShader)
-
-    return program
+    return nil
 }
