@@ -18,14 +18,14 @@ type RotationState struct {
 }
 
 // Структура кубика пьедестала
-type PiedestalCube struct {
+type Cube struct {
 	position mgl32.Vec3  // Позиция относительно центра пьедестала
 	color    mgl32.Vec3  // Цвет кубика
 }
 
 // Создание пьедестала почета
-func createPiedestal() []PiedestalCube {
-	return []PiedestalCube{
+func createPiedestal() []Cube {
+	return []Cube{
 		// 1 место - Золото (нижний кубик)
 		{
 			position: mgl32.Vec3{0.0, 0.0, 0.0},
@@ -50,8 +50,7 @@ func createPiedestal() []PiedestalCube {
 }
 
 // Рендеринг
-func DrawScene(window *glfw.Window, program uint32, vao uint32, view, projection mgl32.Mat4, 
-			   texture uint32, rotationState *RotationState) {
+func DrawScene(window *glfw.Window, program uint32, vao uint32, view, projection mgl32.Mat4, rotationState *RotationState) {
 	
 	// Очистка экрана
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
@@ -64,7 +63,6 @@ func DrawScene(window *glfw.Window, program uint32, vao uint32, view, projection
 	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
 	projUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
 	colorUniform := gl.GetUniformLocation(program, gl.Str("cubeColor\x00"))
-	useTextureUniform := gl.GetUniformLocation(program, gl.Str("useTexture\x00"))
 
 	// Передача view и projection матриц
 	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
@@ -110,9 +108,6 @@ func DrawScene(window *glfw.Window, program uint32, vao uint32, view, projection
 		
 		// Передаем цвет кубика
 		gl.Uniform3f(colorUniform, cube.color.X(), cube.color.Y(), cube.color.Z())
-		
-		// Не используем текстуру для кубиков пьедестала
-		gl.Uniform1i(useTextureUniform, 0)
 		
 		// Отрисовка кубика
 		gl.DrawElements(gl.TRIANGLES, int32(len(objects.CubeIndices)), gl.UNSIGNED_INT, unsafe.Pointer(nil))

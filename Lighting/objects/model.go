@@ -1,0 +1,162 @@
+package objects
+
+import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/go-gl/gl/v4.6-core/gl"
+)
+
+type Model struct {
+	VAO         uint32
+	VBO         uint32
+	VertexCount int32
+}
+
+func LoadOBJ(path string) (*Model, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open OBJ file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	positions := make([][3]float32, 0)
+	vertices := make([]float32, 0)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+
+		switch fields[0] {
+		case "v":
+			if len(fields) < 4 {
+				continue
+			}
+			x, err1 := strconv.ParseFloat(fields[1], 32)
+			y, err2 := strconv.ParseFloat(fields[2], 32)
+			z, err3 := strconv.ParseFloat(fields[3], 32)
+			if err1 != nil || err2 != nil || err3 != nil {
+				return nil, fmt.Errorf("invalid vertex data in OBJ: %s", line)
+			}
+			positions = append(positions, [3]float32{float32(x), float32(y), float32(z)})
+		case "f":
+			if len(fields) < 4 {
+				continue
+			}
+
+			indices := make([]int, 0, len(fields)-1)
+			for _, part := range fields[1:] {
+				idx, err := parseOBJIndex(part, len(positions))
+				if err != nil {
+					return nil, err
+				}
+				indices = append(indices, idx)
+			}
+
+			for i := 1; i < len(indices)-1; i++ {
+				appendVertex(&vertices, positions[indices[0]])
+				appendVertex(&vertices, positions[indices[i]])
+				appendVertex(&vertices, positions[indices[i+1]])
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan OBJ file %s: %w", path, err)
+	}
+
+	if len(vertices) == 0 {
+		return nil, fmt.Errorf("no geometry found in OBJ file %s", path)
+	}
+
+	return CreateModel(vertices)
+}
+
+func parseOBJIndex(token string, vertexCount int) (int, error) {
+	if token == "" {
+		return 0, fmt.Errorf("empty face vertex in OBJ")
+	}
+
+	parts := strings.Split(token, "/")
+	if len(parts) < 1 {
+		return 0, fmt.Errorf("invalid face token: %s", token)
+	}
+
+	index, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, fmt.Errorf("invalid OBJ vertex index: %s", token)
+	}
+
+	if index < 0 {
+		index = vertexCount + index
+	} else {
+		index = index - 1
+	}
+
+	if index < 0 || index >= vertexCount {
+		return 0, fmt.Errorf("OBJ vertex index out of range: %s", token)
+	}
+
+	return index, nil
+}
+
+func appendVertex(vertices *[]float32, position [3]float32) {
+	// Use a constant color (white) instead of position-based coloring
+	color := [3]float32{1.0, 1.0, 1.0}
+
+	*vertices = append(*vertices,
+		position[0], position[1], position[2],
+		color[0], color[1], color[2],
+	)
+}
+
+func clamp01(value float32) float32 {
+	return float32(math.Max(0.0, math.Min(1.0, float64(value))))
+}
+
+func CreateModel(vertices []float32) (*Model, error) {
+	var vao, vbo uint32
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo)
+
+	gl.BindVertexArray(vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
+
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0))
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4))
+	gl.EnableVertexAttribArray(1)
+
+	gl.BindVertexArray(0)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+
+	return &Model{
+		VAO:         vao,
+		VBO:         vbo,
+		VertexCount: int32(len(vertices) / 6),
+	}, nil
+}
+
+func (m *Model) Draw() {
+	gl.BindVertexArray(m.VAO)
+	gl.DrawArrays(gl.TRIANGLES, 0, m.VertexCount)
+	gl.BindVertexArray(0)
+}
+
+func (m *Model) Delete() {
+	gl.DeleteVertexArrays(1, &m.VAO)
+	gl.DeleteBuffers(1, &m.VBO)
+}

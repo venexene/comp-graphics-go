@@ -11,7 +11,6 @@ import (
 
 	"github.com/venexene/comp-graphics-go/objects"
 	"github.com/venexene/comp-graphics-go/shaders"
-	"github.com/venexene/comp-graphics-go/textures"
 	"github.com/venexene/comp-graphics-go/utils"
 )
 
@@ -42,8 +41,6 @@ func main() {
 	// Создание projection
 	projection := mgl32.Perspective(mgl32.DegToRad(40.0), float32(width)/height, 0.1, 100.0)
 
-	texture := textures.LoadTexture("textures/texture.png")
-	
 	// Инициализация состояния поворотов
 	rotationState := &utils.RotationState{}
 
@@ -52,7 +49,7 @@ func main() {
 
 	// Основной цикл рендеринга
 	for !window.ShouldClose() {
-		utils.DrawScene(window, program, vao, view, projection, texture, rotationState)
+		utils.DrawScene(window, program, vao, view, projection, rotationState)
 	}
 
 	// Очистка ресурсов
@@ -90,9 +87,6 @@ func keyCallback(rotationState *utils.RotationState) glfw.KeyCallback {
 				rotationState.PiedestalRotation = 0
 				rotationState.GlobalRotation = 0
 			}
-			
-			log.Printf("Rotations - Local: %.2f, Piedestal: %.2f, Global: %.2f", 
-				rotationState.LocalRotation, rotationState.PiedestalRotation, rotationState.GlobalRotation)
 		}
 	}
 }
