@@ -403,3 +403,59 @@ func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32
 	glfw.PollEvents()
 	window.SwapBuffers()
 }
+
+// UI-related getter/setter functions
+func GetLightingName() string {
+	return shaders.GetCurrentLightingName()
+}
+
+func CycleLighting(forward bool) {
+	shaders.CycleLightingVariant(forward)
+}
+
+func ToggleShadingMode() {
+	shaders.ToggleShadingMode()
+}
+
+func GetShadingMode() string {
+	mode := shaders.GetCurrentShadingMode()
+	if mode == shaders.ShadingGouraud {
+		return "Gouraud"
+	}
+	return "Phong"
+}
+
+func GetLinearCoef() float32 {
+	return lightLinearCoef
+}
+
+func SetLinearCoef(coef float32) {
+	if coef < 0.0 {
+		coef = 0.0
+	}
+	lightLinearCoef = coef
+}
+
+func GetQuadraticCoef() float32 {
+	return lightQuadraticCoef
+}
+
+func SetQuadraticCoef(coef float32) {
+	if coef < 0.0 {
+		coef = 0.0
+	}
+	lightQuadraticCoef = coef
+}
+
+func GetAmbientStrength() float32 {
+	return ambientStrength
+}
+
+func SetAmbientStrength(strength float32) {
+	if strength < 0.0 {
+		strength = 0.0
+	} else if strength > 1.0 {
+		strength = 1.0
+	}
+	ambientStrength = strength
+}

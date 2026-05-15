@@ -12,6 +12,7 @@ import (
 
 	"github.com/venexene/comp-graphics-go/objects"
 	"github.com/venexene/comp-graphics-go/shaders"
+	"github.com/venexene/comp-graphics-go/ui"
 	"github.com/venexene/comp-graphics-go/utils"
 )
 
@@ -32,6 +33,12 @@ func main() {
 		panic(err)
 	}
 	defer shaders.CleanupLightingVariants()
+
+	// Initialize UI
+	if err := ui.InitializeUI(window); err != nil {
+		panic(fmt.Errorf("failed to initialize UI: %w", err))
+	}
+	defer ui.Cleanup()
 
 	// Initialize scene (textures, etc)
 	utils.InitScene()
@@ -58,18 +65,30 @@ func main() {
 
 	fmt.Println("OBJ model loaded:", objPath)
 	fmt.Println("Lighting variants loaded:", shaders.GetLightingVariantCount())
-	fmt.Println("Controls:")
-	fmt.Println("  T/G: Next/Previous lighting variant")
-	fmt.Println("  Arrow keys: Rotate camera")
-	fmt.Println("  WASD: Pan camera")
-	fmt.Println("  +/-: Zoom")
-	fmt.Println("  Q/E: Scale object")
-	fmt.Println("  IJKL/U/O: Move object")
-	fmt.Println("  Ctrl+R: Reset")
+	fmt.Println("\n" + ui.GetUIOverlayText(
+		utils.GetLightingName,
+		utils.GetShadingMode,
+		utils.GetLinearCoef,
+		utils.GetQuadraticCoef,
+		utils.GetAmbientStrength,
+	))
 
 	// Основной цикл рендеринга
 	for !window.ShouldClose() {
+		ui.BeginFrame()
 		utils.DrawScene(window, model, view, projection)
+		
+		// Update window title with current state
+		title := fmt.Sprintf("Model: %s | Shading: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
+			utils.GetLightingName(),
+			utils.GetShadingMode(),
+			utils.GetLinearCoef(),
+			utils.GetQuadraticCoef(),
+			utils.GetAmbientStrength(),
+		)
+		window.SetTitle(title)
+		
+		ui.EndFrame()
 	}
 }
 
