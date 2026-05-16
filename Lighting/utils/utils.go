@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"fmt"
 	"math"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-gl/gl/v4.6-core/gl"
@@ -18,17 +21,18 @@ var (
 	lastTKeyState = false
 	lastGKeyState = false
 	lastYKeyState = false
+	lastTabKeyState = false
 )
 
 var (
-	defaultTexture    uint32
-	lightPosition     = mgl32.Vec3{2.0, 4.0, 3.0}
-	lightConstant     float32 = 1.0
-	lightLinear       float32 = 0.09
-	lightQuadratic    float32 = 0.032
-	lightLinearCoef   float32 = 0.5
+	defaultTexture     uint32
+	lightPosition              = mgl32.Vec3{2.0, 4.0, 3.0}
+	lightConstant      float32 = 1.0
+	lightLinear        float32 = 0.09
+	lightQuadratic     float32 = 0.032
+	lightLinearCoef    float32 = 0.5
 	lightQuadraticCoef float32 = 0.5
-	ambientStrength   float32 = 0.6
+	ambientStrength    float32 = 0.6
 )
 
 // CreateWhiteTexture creates a simple 1x1 white texture for the default material
@@ -73,6 +77,23 @@ var (
 	objectState = ObjectState{Position: mgl32.Vec3{0, 0, 0}, Scale: 1.0, RotationX: 0.0, RotationY: 0.0, RotationZ: 0.0}
 )
 
+// SceneObject represents an object in the scene with its own transform
+type SceneObject struct {
+	Model     *objects.Model
+	Position  mgl32.Vec3
+	Scale     float32
+	RotationZ float32
+	Name      string
+}
+
+var (
+	// sceneObjects holds registered extra scene objects (excluding main model)
+	sceneObjects []*SceneObject
+	// selectedIndex: 0 = main model (objectState), 1..n = sceneObjects[0..]
+	selectedIndex = 0
+	mainObjectName = "Main"
+)
+
 // InitScene initializes the rendering scene (textures, etc)
 func InitScene() {
 	defaultTexture = CreateWhiteTexture()
@@ -104,15 +125,15 @@ func ProcessInput(window *glfw.Window) {
 	}
 	if window.GetKey(glfw.KeyA) == glfw.Press {
 		// Панорамирование влево
-		dir := right.Normalize().Mul(-0.01)
+		dir := right.Normalize().Mul(0.01)
 		camera.Target = camera.Target.Add(dir)
 	}
 	if window.GetKey(glfw.KeyD) == glfw.Press {
 		// Панорамирование вправо
-		dir := right.Normalize().Mul(0.01)
+		dir := right.Normalize().Mul(-0.01)
 		camera.Target = camera.Target.Add(dir)
 	}
-	
+
 	// Вертикальное панорамирование камеры
 	if window.GetKey(glfw.KeySpace) == glfw.Press {
 		camera.Target = camera.Target.Add(mgl32.Vec3{0, 0.01, 0})
@@ -136,35 +157,86 @@ func ProcessInput(window *glfw.Window) {
 	}
 
 	// Перемещение объекта (IJKL для XZ, UO для Y)
-	if window.GetKey(glfw.KeyI) == glfw.Press {
-		objectState.Position[2] -= 0.01 // Вперед
-	}
-	if window.GetKey(glfw.KeyK) == glfw.Press {
-		objectState.Position[2] += 0.01 // Назад
-	}
-	if window.GetKey(glfw.KeyJ) == glfw.Press {
-		objectState.Position[0] -= 0.01 // Влево
-	}
-	if window.GetKey(glfw.KeyL) == glfw.Press {
-		objectState.Position[0] += 0.01 // Вправо
-	}
-	if window.GetKey(glfw.KeyU) == glfw.Press {
-		objectState.Position[1] += 0.01 // Вверх
-	}
-	if window.GetKey(glfw.KeyO) == glfw.Press {
-		objectState.Position[1] -= 0.01 // Вниз
+	// Удерживайте Alt, чтобы перемещать источник света вместо объекта
+	altDown := window.GetKey(glfw.KeyLeftAlt) == glfw.Press || window.GetKey(glfw.KeyRightAlt) == glfw.Press
+
+	if altDown {
+		if window.GetKey(glfw.KeyI) == glfw.Press {
+			lightPosition[2] -= 0.01 // Вперед
+		}
+		if window.GetKey(glfw.KeyK) == glfw.Press {
+			lightPosition[2] += 0.01 // Назад
+		}
+		if window.GetKey(glfw.KeyJ) == glfw.Press {
+			lightPosition[0] -= 0.01 // Влево
+		}
+		if window.GetKey(glfw.KeyL) == glfw.Press {
+			lightPosition[0] += 0.01 // Вправо
+		}
+		if window.GetKey(glfw.KeyU) == glfw.Press {
+			lightPosition[1] += 0.01 // Вверх
+		}
+		if window.GetKey(glfw.KeyO) == glfw.Press {
+			lightPosition[1] -= 0.01 // Вниз
+		}
+	} else {
+		// Move the currently selected object (0 = main, 1..n = sceneObjects)
+		targetIsMain := selectedIndex == 0
+
+		if window.GetKey(glfw.KeyI) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[2] -= 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[2] -= 0.01
+			}
+		}
+		if window.GetKey(glfw.KeyK) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[2] += 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[2] += 0.01
+			}
+		}
+		if window.GetKey(glfw.KeyJ) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[0] -= 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[0] -= 0.01
+			}
+		}
+		if window.GetKey(glfw.KeyL) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[0] += 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[0] += 0.01
+			}
+		}
+		if window.GetKey(glfw.KeyU) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[1] += 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[1] += 0.01
+			}
+		}
+		if window.GetKey(glfw.KeyO) == glfw.Press {
+			if targetIsMain {
+				objectState.Position[1] -= 0.01
+			} else {
+				sceneObjects[selectedIndex-1].Position[1] -= 0.01
+			}
+		}
 	}
 
 	// Вращение камеры (стрелки)
 	if window.GetKey(glfw.KeyUp) == glfw.Press {
 		camera.Pitch -= 0.01
-		if camera.Pitch < -math.Pi/2 + 0.1 {
+		if camera.Pitch < -math.Pi/2+0.1 {
 			camera.Pitch = -math.Pi/2 + 0.1
 		}
 	}
 	if window.GetKey(glfw.KeyDown) == glfw.Press {
 		camera.Pitch += 0.01
-		if camera.Pitch > math.Pi/2 - 0.1 {
+		if camera.Pitch > math.Pi/2-0.1 {
 			camera.Pitch = math.Pi/2 - 0.1
 		}
 	}
@@ -187,6 +259,7 @@ func ProcessInput(window *glfw.Window) {
 	currentTKeyState := window.GetKey(glfw.KeyT) == glfw.Press
 	currentGKeyState := window.GetKey(glfw.KeyG) == glfw.Press
 	currentYKeyState := window.GetKey(glfw.KeyY) == glfw.Press
+	currentTabKeyState := window.GetKey(glfw.KeyTab) == glfw.Press
 
 	if currentTKeyState && !lastTKeyState {
 		shaders.CycleLightingVariant(true)
@@ -197,10 +270,19 @@ func ProcessInput(window *glfw.Window) {
 	if currentYKeyState && !lastYKeyState {
 		shaders.ToggleShadingMode()
 	}
+	if currentTabKeyState && !lastTabKeyState {
+		// Cycle selected object forward
+		if len(sceneObjects) > 0 {
+			selectedIndex = (selectedIndex + 1) % (1 + len(sceneObjects))
+		} else {
+			selectedIndex = 0
+		}
+	}
 
 	lastTKeyState = currentTKeyState
 	lastGKeyState = currentGKeyState
 	lastYKeyState = currentYKeyState
+	lastTabKeyState = currentTabKeyState
 
 	// Уровни затухания света
 	if window.GetKey(glfw.KeyZ) == glfw.Press {
@@ -251,8 +333,8 @@ func ProcessInput(window *glfw.Window) {
 	}
 
 	// Сброс позиции объекта и камеры (Ctrl+R)
-	if window.GetKey(glfw.KeyR) == glfw.Press && 
-	   window.GetKey(glfw.KeyLeftControl) == glfw.Press {
+	if window.GetKey(glfw.KeyR) == glfw.Press &&
+		window.GetKey(glfw.KeyLeftControl) == glfw.Press {
 		objectState.Position = mgl32.Vec3{0.0, 0.0, 0.0}
 		objectState.Scale = 1.0
 		objectState.RotationX = 0.0
@@ -266,7 +348,7 @@ func ProcessInput(window *glfw.Window) {
 }
 
 // Рендеринг
-func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32.Mat4) {
+func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32.Mat4, extras ...*SceneObject) {
 	// Обработка ввода
 	ProcessInput(window)
 
@@ -304,7 +386,7 @@ func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32
 	x := camera.Distance * float32(math.Cos(float64(camera.Yaw))) * float32(math.Cos(float64(camera.Pitch)))
 	y := camera.Distance * float32(math.Sin(float64(camera.Pitch)))
 	z := camera.Distance * float32(math.Sin(float64(camera.Yaw))) * float32(math.Cos(float64(camera.Pitch)))
-	
+
 	cameraPosition := camera.Target.Add(mgl32.Vec3{x, y, z})
 
 	// Обновление view матрицы на основе позиции камеры
@@ -323,13 +405,13 @@ func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32
 
 	// СОЗДАНИЕ МАТРИЦЫ МОДЕЛИ
 	scale := mgl32.Scale3D(objectState.Scale, objectState.Scale, objectState.Scale)
-	
+
 	// Вращение только вокруг Z
 	rotationZ := mgl32.HomogRotate3D(objectState.RotationZ, mgl32.Vec3{0, 0, 1})
-	
+
 	// Перемещение
 	translation := mgl32.Translate3D(objectState.Position.X(), objectState.Position.Y(), objectState.Position.Z())
-	
+
 	// Комбинированная матрица модели: translation * rotation * scale
 	modelMat := translation.Mul4(rotationZ.Mul4(scale))
 
@@ -398,7 +480,47 @@ func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32
 	gl.BindTexture(gl.TEXTURE_2D, defaultTexture)
 
 	// Отрисовка загруженной модели
-	model.Draw()
+	if model != nil {
+		model.Draw()
+	}
+
+	// Рендер дополнительного содержимого сцены (сердце, дефолт и т.д.)
+	for _, obj := range extras {
+		if obj == nil || obj.Model == nil {
+			continue
+		}
+
+		// Построение матрицы модели для дополнительного объекта
+		scaleMat := mgl32.Scale3D(obj.Scale, obj.Scale, obj.Scale)
+		rotZ := mgl32.HomogRotate3D(obj.RotationZ, mgl32.Vec3{0, 0, 1})
+		trans := mgl32.Translate3D(obj.Position.X(), obj.Position.Y(), obj.Position.Z())
+		objModelMat := trans.Mul4(rotZ.Mul4(scaleMat))
+
+		if modelUniform != -1 {
+			gl.UniformMatrix4fv(modelUniform, 1, false, &objModelMat[0])
+		}
+		if normalUniform != -1 {
+			m := objModelMat.Inv().Transpose()
+			normalMat := mgl32.Mat3{
+				m[0], m[1], m[2],
+				m[4], m[5], m[6],
+				m[8], m[9], m[10],
+			}
+			gl.UniformMatrix3fv(normalUniform, 1, false, &normalMat[0])
+		}
+
+		obj.Model.Draw()
+
+		// Restore main model matrix after drawing extra (so UI/main draw not affected)
+		if modelUniform != -1 && model != nil {
+			// rebuild main model matrix from objectState
+			scale := mgl32.Scale3D(objectState.Scale, objectState.Scale, objectState.Scale)
+			rotationZ := mgl32.HomogRotate3D(objectState.RotationZ, mgl32.Vec3{0, 0, 1})
+			translation := mgl32.Translate3D(objectState.Position.X(), objectState.Position.Y(), objectState.Position.Z())
+			mainModelMat := translation.Mul4(rotationZ.Mul4(scale))
+			gl.UniformMatrix4fv(modelUniform, 1, false, &mainModelMat[0])
+		}
+	}
 
 	glfw.PollEvents()
 	window.SwapBuffers()
@@ -458,4 +580,36 @@ func SetAmbientStrength(strength float32) {
 		strength = 1.0
 	}
 	ambientStrength = strength
+}
+
+// GetLightPosition returns the current light position as X,Y,Z
+func GetLightPosition() (float32, float32, float32) {
+	return lightPosition.X(), lightPosition.Y(), lightPosition.Z()
+}
+
+// Scene registration and selection helpers
+func RegisterSceneObjects(objs ...*SceneObject) {
+	sceneObjects = objs
+}
+
+func GetSelectedObjectName() string {
+	if selectedIndex == 0 {
+		// strip path and extension if a full path was provided
+		base := filepath.Base(mainObjectName)
+		return strings.TrimSuffix(base, filepath.Ext(base))
+	}
+	idx := selectedIndex - 1
+	if idx >= 0 && idx < len(sceneObjects) && sceneObjects[idx] != nil {
+		if sceneObjects[idx].Name != "" {
+			// ensure scene object name has no path or extension
+			base := filepath.Base(sceneObjects[idx].Name)
+			return strings.TrimSuffix(base, filepath.Ext(base))
+		}
+		return fmt.Sprintf("Object%d", idx)
+	}
+	return "None"
+}
+
+func SetMainObjectName(name string) {
+	mainObjectName = name
 }

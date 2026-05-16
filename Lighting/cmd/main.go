@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/go-gl/gl/v4.6-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -18,8 +20,8 @@ import (
 
 // Размеры окна
 const (
-    width  = 1000
-    height = 500
+	width  = 1280
+	height = 720
 )
 
 func main() {
@@ -54,6 +56,29 @@ func main() {
 	}
 	defer model.Delete()
 
+	// Load additional scene objects (heart and default) placed near the snowman
+	heartModel, err := objects.LoadOBJ("models/heart.obj")
+	if err != nil {
+		panic(fmt.Errorf("failed to load heart OBJ: %w", err))
+	}
+	defer heartModel.Delete()
+
+	defaultModel, err := objects.LoadOBJ("models/default.obj")
+	if err != nil {
+		panic(fmt.Errorf("failed to load default OBJ: %w", err))
+	}
+	defer defaultModel.Delete()
+
+	// Place models in a horizontal line with equal spacing and no rotation
+	// Increase spacing to avoid intersections with the snowman
+	spacing := float32(4.0)
+	// derive friendly names from file names (strip path and extension)
+	heartName := strings.TrimSuffix(filepath.Base("models/heart.obj"), filepath.Ext("models/heart.obj"))
+	defaultName := strings.TrimSuffix(filepath.Base("models/default.obj"), filepath.Ext("models/default.obj"))
+
+	heartObj := &utils.SceneObject{Model: heartModel, Position: mgl32.Vec3{spacing, 0.0, 0.0}, Scale: 0.6, RotationZ: 0.0, Name: heartName}
+	defaultObj := &utils.SceneObject{Model: defaultModel, Position: mgl32.Vec3{-spacing, 0.0, 0.0}, Scale: 0.6, RotationZ: 0.0, Name: defaultName}
+
 	// Настройка состояния OpenGL
 	gl.Enable(gl.DEPTH_TEST)
 	
@@ -65,21 +90,33 @@ func main() {
 
 	fmt.Println("OBJ model loaded:", objPath)
 	fmt.Println("Lighting variants loaded:", shaders.GetLightingVariantCount())
+
+	// Register extras for selection and set main object name
+	utils.RegisterSceneObjects(heartObj, defaultObj)
+	utils.SetMainObjectName(objPath)
+
+	// Print UI overlay now that objects are registered
 	fmt.Println("\n" + ui.GetUIOverlayText(
 		utils.GetLightingName,
 		utils.GetShadingMode,
 		utils.GetLinearCoef,
 		utils.GetQuadraticCoef,
 		utils.GetAmbientStrength,
+		utils.GetLightPosition,
+		utils.GetSelectedObjectName,
 	))
 
 	// Основной цикл рендеринга
 	for !window.ShouldClose() {
 		ui.BeginFrame()
-		utils.DrawScene(window, model, view, projection)
+		utils.DrawScene(window, model, view, projection, heartObj, defaultObj)
 		
-		// Update window title with current state
-		title := fmt.Sprintf("Model: %s | Shading: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
+		// Update window title with current state (including light position)
+		lx, ly, lz := utils.GetLightPosition()
+		selected := utils.GetSelectedObjectName()
+		title := fmt.Sprintf("Selected: %s | Light:(%.2f,%.2f,%.2f) | Model: %s | Shading: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
+			selected,
+			lx, ly, lz,
 			utils.GetLightingName(),
 			utils.GetShadingMode(),
 			utils.GetLinearCoef(),

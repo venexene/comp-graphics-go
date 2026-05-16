@@ -65,13 +65,20 @@ func GetUIOverlayText(
 	getLinearCoef func() float32,
 	getQuadraticCoef func() float32,
 	getAmbientStrength func() float32,
+	getLightPosition func() (float32, float32, float32),
+	getSelectedObjectName func() string,
 ) string {
+	lx, ly, lz := getLightPosition()
 	text := fmt.Sprintf(`
 ╔═══════════════════════════════════╗
 ║     LIGHTING CONTROLS UI          ║
 ╠═══════════════════════════════════╣
 ║ Model: %-27s ║
 ║ Shading: %-25s ║
+║ Selected: %-23s ║
+╠═══════════════════════════════════╣
+║ LIGHT POSITION                    ║
+║   X: %6.2f  Y: %6.2f  Z: %6.2f   ║
 ╠═══════════════════════════════════╣
 ║ ATTENUATION PARAMETERS            ║
 ║   Linear Falloff (Z/X):    %.2f   ║
@@ -89,11 +96,15 @@ func GetUIOverlayText(
 ║   Q/E     - Scale Object          ║
 ║   IJKL    - Move Object XY        ║
 ║   U/O     - Move Object Z         ║
+║   Alt+IJKL- Move Light XY         ║
+║   Alt+U/O - Move Light Z          ║
 ║   Ctrl+R  - Reset All             ║
 ╚═══════════════════════════════════╝
 `,
 		getLightingName(),
 		getShadingMode(),
+		getSelectedObjectName(),
+		lx, ly, lz,
 		getLinearCoef(),
 		getQuadraticCoef(),
 		getAmbientStrength(),
