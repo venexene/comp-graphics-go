@@ -219,34 +219,6 @@ func createVertexFromOBJ(positions [][3]float32, texCoords [][2]float32, normals
 	return v
 }
 
-func parseOBJIndex(token string, vertexCount int) (int, error) {
-	if token == "" {
-		return 0, fmt.Errorf("empty face vertex in OBJ")
-	}
-
-	parts := strings.Split(token, "/")
-	if len(parts) < 1 {
-		return 0, fmt.Errorf("invalid face token: %s", token)
-	}
-
-	index, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return 0, fmt.Errorf("invalid OBJ vertex index: %s", token)
-	}
-
-	if index < 0 {
-		index = vertexCount + index
-	} else {
-		index = index - 1
-	}
-
-	if index < 0 || index >= vertexCount {
-		return 0, fmt.Errorf("OBJ vertex index out of range: %s", token)
-	}
-
-	return index, nil
-}
-
 func normalize3f(v [3]float32) [3]float32 {
 	len := math.Sqrt(float64(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]))
 	if len < 0.0001 {
@@ -258,20 +230,6 @@ func normalize3f(v [3]float32) [3]float32 {
 
 func add3f(a, b [3]float32) [3]float32 {
 	return [3]float32{a[0] + b[0], a[1] + b[1], a[2] + b[2]}
-}
-
-func appendVertex(vertices *[]float32, position [3]float32) {
-	// Use a constant color (white) instead of position-based coloring
-	color := [3]float32{1.0, 1.0, 1.0}
-
-	*vertices = append(*vertices,
-		position[0], position[1], position[2],
-		color[0], color[1], color[2],
-	)
-}
-
-func clamp01(value float32) float32 {
-	return float32(math.Max(0.0, math.Min(1.0, float64(value))))
 }
 
 func CreateModelFromVertices(vertices []Vertex) (*Model, error) {

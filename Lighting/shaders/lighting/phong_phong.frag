@@ -11,6 +11,7 @@ in Vertex {
 uniform sampler2D diffuse_map;
 uniform float linear_coef;
 uniform float quadratic_coef;
+uniform int attenuation_mode;
 
 uniform struct Material {
 	vec3 ambient;
@@ -40,9 +41,16 @@ void main() {
     vec3 view_dir = normalize(vert.view_dir);
     vec3 refl_dir = reflect(-light_dir, norm);
 
-    float attenuation = 1.0 / max(light.constant + 
-        (light.linear * linear_coef) * vert.distance + 
-        (light.quadratic * quadratic_coef) * vert.distance * vert.distance, 0.0001);
+    float attenuation;
+    if (attenuation_mode == 1) {
+        attenuation = 1.0 / max(light.constant + (light.linear * linear_coef) * vert.distance, 0.0001);
+    } else if (attenuation_mode == 2) {
+        attenuation = 1.0 / max(light.constant + (light.quadratic * quadratic_coef) * vert.distance * vert.distance, 0.0001);
+    } else {
+        attenuation = 1.0 / max(light.constant + 
+            (light.linear * linear_coef) * vert.distance + 
+            (light.quadratic * quadratic_coef) * vert.distance * vert.distance, 0.0001);
+    }
 
     float norm_d_light = max(dot(norm, light_dir), 0.0);
     float view_d_refl = max(dot(view_dir, refl_dir), 0.0);

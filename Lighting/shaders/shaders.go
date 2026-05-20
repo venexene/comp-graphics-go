@@ -13,21 +13,19 @@ func LoadShaderFile(filename string) (string, error) {
     if err != nil {
         return "", fmt.Errorf("failed to read shader file %s: %v", filename, err)
     }
-    return string(data) + "\x00", nil
+    return string(data), nil
 }
 
 // Компиляция шейдера
 func CompileShader(source string, shaderType uint32) (uint32, error) {
-	shader := gl.CreateShader(shaderType) // Создание объекта шейдера с передачей типа шейдера
+	shader := gl.CreateShader(shaderType)
 
-	// Передача кода в шейдер
-	// gl.Strs - преобразование Go-строки в C-строку
-	// csource - указатель на массив C-строки
-	// free - функция для освобождения памяти
-	csources, free := gl.Strs(source)
-	gl.ShaderSource(shader, 1, csources, nil) // Загрузка кода шейдера
-	free() // Освобождение памяти
-	gl.CompileShader(shader) // Компиляция шейдера
+	// Convert Go string to null-terminated C string and pass with explicit length
+	csource, free := gl.Strs(source)
+	length := int32(len(source))
+	gl.ShaderSource(shader, 1, csource, &length)
+	free()
+	gl.CompileShader(shader)
 
 	// Проверка результата компиляции (примерно как в initOpenGL)
 	var status int32

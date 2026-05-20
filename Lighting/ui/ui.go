@@ -27,32 +27,6 @@ func EndFrame() {
 	// No-op for text-based UI
 }
 
-// ShowLightingControlPanel displays the lighting control UI
-func ShowLightingControlPanel(
-	getLightingName func() string,
-	cycleLighting func(forward bool),
-	toggleShading func(),
-	getShadingMode func() string,
-	getLinearCoef func() float32,
-	setLinearCoef func(float32),
-	getQuadraticCoef func() float32,
-	setQuadraticCoef func(float32),
-	getAmbientStrength func() float32,
-	setAmbientStrength func(float32),
-) {
-	// Store references for rendering in overlay
-	_ = getLightingName
-	_ = cycleLighting
-	_ = toggleShading
-	_ = getShadingMode
-	_ = getLinearCoef
-	_ = setLinearCoef
-	_ = getQuadraticCoef
-	_ = setQuadraticCoef
-	_ = getAmbientStrength
-	_ = setAmbientStrength
-}
-
 // Cleanup releases UI resources
 func Cleanup() {
 	// No-op for text-based UI
@@ -67,6 +41,7 @@ func GetUIOverlayText(
 	getAmbientStrength func() float32,
 	getLightPosition func() (float32, float32, float32),
 	getSelectedObjectName func() string,
+	getAttenuationMode func() string,
 ) string {
 	lx, ly, lz := getLightPosition()
 	text := fmt.Sprintf(`
@@ -80,9 +55,10 @@ func GetUIOverlayText(
 ║ LIGHT POSITION                    ║
 ║   X: %6.2f  Y: %6.2f  Z: %6.2f   ║
 ╠═══════════════════════════════════╣
-║ ATTENUATION PARAMETERS            ║
-║   Linear Falloff (Z/X):    %.2f   ║
-║   Quadratic Falloff (C/V): %.2f   ║
+║ ATTENUATION                       ║
+║   Mode (M):      %-15s ║
+║   Linear Coef (Z/X):  %.2f   ║
+║   Quad. Coef (C/V):   %.2f   ║
 ╠═══════════════════════════════════╣
 ║ LIGHT POWER                       ║
 ║   Ambient Strength (B/N):  %.2f   ║
@@ -90,10 +66,15 @@ func GetUIOverlayText(
 ║ KEYBOARD SHORTCUTS                ║
 ║   T/G     - Switch Lighting Model ║
 ║   Y       - Toggle Gouraud/Phong  ║
+║   M       - Cycle Attenuation     ║
+║   Tab     - Select Next Object    ║
 ║   Arrows  - Rotate Camera         ║
 ║   WASD    - Pan Camera            ║
 ║   +/-     - Zoom In/Out           ║
 ║   Q/E     - Scale Object          ║
+║   R/F     - Rotate Object Z       ║
+║   1/2     - Rotate Object X       ║
+║   3/4     - Rotate Object Y       ║
 ║   IJKL    - Move Object XY        ║
 ║   U/O     - Move Object Z         ║
 ║   Alt+IJKL- Move Light XY         ║
@@ -105,6 +86,7 @@ func GetUIOverlayText(
 		getShadingMode(),
 		getSelectedObjectName(),
 		lx, ly, lz,
+		getAttenuationMode(),
 		getLinearCoef(),
 		getQuadraticCoef(),
 		getAmbientStrength(),

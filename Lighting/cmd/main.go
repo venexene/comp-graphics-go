@@ -27,10 +27,17 @@ const (
 func main() {
 	runtime.LockOSThread()
 
+	// Resolve project root so shaders and models are found regardless of CWD
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		panic(fmt.Errorf("cannot find project root: %w", err))
+	}
+	shaders.SetBasePath(projectRoot)
+
 	window := initGlfw()
 	defer glfw.Terminate()
 
-	err := initOpenGL()
+	err = initOpenGL()
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +52,7 @@ func main() {
 	// Initialize scene (textures, etc)
 	utils.InitScene()
 
-	objPath := "models/snowman.obj"
+	objPath := filepath.Join(projectRoot, "models", "snowman.obj")
 	if len(os.Args) > 1 {
 		objPath = os.Args[1]
 	}
@@ -57,13 +64,13 @@ func main() {
 	defer model.Delete()
 
 	// Load additional scene objects (heart and default) placed near the snowman
-	heartModel, err := objects.LoadOBJ("models/heart.obj")
+	heartModel, err := objects.LoadOBJ(filepath.Join(projectRoot, "models", "heart.obj"))
 	if err != nil {
 		panic(fmt.Errorf("failed to load heart OBJ: %w", err))
 	}
 	defer heartModel.Delete()
 
-	defaultModel, err := objects.LoadOBJ("models/default.obj")
+	defaultModel, err := objects.LoadOBJ(filepath.Join(projectRoot, "models", "default.obj"))
 	if err != nil {
 		panic(fmt.Errorf("failed to load default OBJ: %w", err))
 	}
@@ -104,6 +111,7 @@ func main() {
 		utils.GetAmbientStrength,
 		utils.GetLightPosition,
 		utils.GetSelectedObjectName,
+		utils.GetAttenuationMode,
 	))
 
 	// Основной цикл рендеринга
@@ -114,11 +122,12 @@ func main() {
 		// Update window title with current state (including light position)
 		lx, ly, lz := utils.GetLightPosition()
 		selected := utils.GetSelectedObjectName()
-		title := fmt.Sprintf("Selected: %s | Light:(%.2f,%.2f,%.2f) | Model: %s | Shading: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
+		title := fmt.Sprintf("Selected: %s | Light:(%.2f,%.2f,%.2f) | Model: %s | Shading: %s | Atten: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
 			selected,
 			lx, ly, lz,
 			utils.GetLightingName(),
 			utils.GetShadingMode(),
+			utils.GetAttenuationMode(),
 			utils.GetLinearCoef(),
 			utils.GetQuadraticCoef(),
 			utils.GetAmbientStrength(),
@@ -164,4 +173,46 @@ func initOpenGL() error {
     }
 
     return nil
+}
+
+// findProjectRoot locates the project root directory by walking up from the
+// executable location (or CWD) until a go.mod file is found.
+func findProjectRoot() (string, error) {
+	// Prefer executable path, fall back to CWD
+	dir := "."
+	if exe, err := os.Executable(); err == nil {
+		dir = filepath.Dir(exe)
+	}
+
+	// Walk up until we find go.mod
+	for {
+		modPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(modPath); err == nil {
+			return filepath.Abs(dir)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root without finding go.mod; try CWD
+			break
+		}
+		dir = parent
+	}
+
+	// Fallback: try current working directory
+	if cwd, err := os.Getwd(); err == nil {
+		dir = cwd
+		for {
+			modPath := filepath.Join(dir, "go.mod")
+			if _, err := os.Stat(modPath); err == nil {
+				return filepath.Abs(dir)
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	return "", fmt.Errorf("go.mod not found in any parent directory")
 }

@@ -35,6 +35,7 @@ uniform struct PointLight {
 uniform sampler2D diffuse_map;
 uniform float linear_coef;
 uniform float quadratic_coef;
+uniform int attenuation_mode;
 
 out vec3 vert_color;
 out vec2 uv_coords;
@@ -51,9 +52,16 @@ void main() {
     view_dir = normalize(view_dir);
 	vec3 refl_dir = reflect(-light_dir, normal);
 
-	float attenuation = 1.0 / max(light.constant + 
-        (light.linear * linear_coef) * distance + 
-        (light.quadratic * quadratic_coef) * distance * distance, 0.0001);
+	float attenuation;
+	if (attenuation_mode == 1) {
+		attenuation = 1.0 / max(light.constant + (light.linear * linear_coef) * distance, 0.0001);
+	} else if (attenuation_mode == 2) {
+		attenuation = 1.0 / max(light.constant + (light.quadratic * quadratic_coef) * distance * distance, 0.0001);
+	} else {
+		attenuation = 1.0 / max(light.constant + 
+			(light.linear * linear_coef) * distance + 
+			(light.quadratic * quadratic_coef) * distance * distance, 0.0001);
+	}
 
 	float norm_d_light = max(dot(normal, light_dir), 0.0);
     float view_d_refl = max(dot(view_dir, refl_dir), 0.0);

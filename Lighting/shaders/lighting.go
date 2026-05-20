@@ -13,6 +13,13 @@ const (
 	ShadingPhong
 )
 
+func (s ShadingMode) String() string {
+	if s == ShadingPhong {
+		return "Phong"
+	}
+	return "Gouraud"
+}
+
 type LightingVariant struct {
 	Name     string
 	Model    string
@@ -33,18 +40,34 @@ var lightingVariants = []LightingVariant{
 	{Name: "Toon Phong", Model: "Toon", Mode: ShadingPhong, VertPath: "shaders/lighting/basic_phong.vert", FragPath: "shaders/lighting/toon_phong.frag"},
 }
 
+// shaderBasePath is prepended to relative shader file paths.
+// Set via SetBasePath before calling InitLightingVariants.
+var shaderBasePath string
+
+// SetBasePath sets the directory prefix for shader file lookups.
+func SetBasePath(base string) {
+	shaderBasePath = base
+}
+
 var currentLightingIndex = 0
 
 func InitLightingVariants() error {
 	for i := range lightingVariants {
-		vert, err := LoadShaderFile(lightingVariants[i].VertPath)
-		if err != nil {
-			return fmt.Errorf("failed to load vertex shader %s: %w", lightingVariants[i].VertPath, err)
+		vertPath := lightingVariants[i].VertPath
+		fragPath := lightingVariants[i].FragPath
+		if shaderBasePath != "" {
+			vertPath = shaderBasePath + "/" + vertPath
+			fragPath = shaderBasePath + "/" + fragPath
 		}
 
-		frag, err := LoadShaderFile(lightingVariants[i].FragPath)
+		vert, err := LoadShaderFile(vertPath)
 		if err != nil {
-			return fmt.Errorf("failed to load fragment shader %s: %w", lightingVariants[i].FragPath, err)
+			return fmt.Errorf("failed to load vertex shader %s: %w", vertPath, err)
+		}
+
+		frag, err := LoadShaderFile(fragPath)
+		if err != nil {
+			return fmt.Errorf("failed to load fragment shader %s: %w", fragPath, err)
 		}
 
 		vertShader, err := CompileShader(vert, gl.VERTEX_SHADER)
@@ -107,21 +130,6 @@ func GetCurrentShadingMode() ShadingMode {
 		currentLightingIndex = 0
 	}
 	return lightingVariants[currentLightingIndex].Mode
-}
-
-func CycleLightingModel(forward bool) {
-	currentMode := GetCurrentShadingMode()
-	start := currentLightingIndex
-	for {
-		if forward {
-			currentLightingIndex = (currentLightingIndex + 1) % len(lightingVariants)
-		} else {
-			currentLightingIndex = (currentLightingIndex - 1 + len(lightingVariants)) % len(lightingVariants)
-		}
-		if lightingVariants[currentLightingIndex].Mode == currentMode || currentLightingIndex == start {
-			break
-		}
-	}
 }
 
 func ToggleShadingMode() {
