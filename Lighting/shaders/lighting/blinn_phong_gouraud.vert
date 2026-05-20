@@ -1,3 +1,10 @@
+// shaders/lighting/blinn_phong_gouraud.vert — Вершинный шейдер Блинн-Фонга (Гуро).
+//
+// Модель освещения: Blinn-Phong (с половинным вектором H).
+// Режим шейдинга: Gouraud.
+// Формула: I = I_a + I_d * max(N·L, 0) + I_s * (max(N·H, 0))^sh
+// Где H = normalize(L + V) — половинный вектор между светом и обзором.
+
 #version 330 core
 
 layout (location = 0) in vec3 position;
@@ -24,11 +31,9 @@ uniform struct PointLight {
 	vec3 diffuse;
 	vec3 specular;
     vec3 position;
-
     float constant;
     float linear;
     float quadratic;
-
 	float ambient_strength;
 } light;
 
@@ -51,9 +56,11 @@ void main() {
 	light_dir = normalize(light_dir);
     view_dir = normalize(view_dir);
 
+	// Половинный вектор H = L + V (нормализованный).
 	vec3 half_dir = normalize(light_dir + view_dir);
 	float norm_d_light = max(dot(normal, light_dir), 0.0);
 
+	// Затухание.
 	float attenuation;
 	if (attenuation_mode == 1) {
 		attenuation = 1.0 / max(light.constant + (light.linear * linear_coef) * distance, 0.0001);
@@ -65,7 +72,7 @@ void main() {
 			(light.quadratic * quadratic_coef) * distance * distance, 0.0001);
 	}
 
-	
+	// Итоговый цвет: фоновое + диффузное + зеркальное (через N·H).
     vec3 base_color = texture(diffuse_map, uv_coords_in).rgb;
     vec3 ambient = light.ambient * base_color * material.ambient * light.ambient_strength * attenuation; 
     vec3 diffuse = light.diffuse * base_color * material.diffuse * norm_d_light * attenuation;

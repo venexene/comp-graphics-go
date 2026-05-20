@@ -1,6 +1,19 @@
-// Package utils provides a compatibility layer that delegates to specialized
-// packages (lighting, scene, input, shaders). New code should import those
-// packages directly.
+// utils/utils.go — Слой совместимости и глобальное состояние.
+//
+// Назначение: предоставляет слой совместимости, который делегирует вызовы
+// специализированным пакетам (lighting, scene, input, shaders).
+// Хранит глобальные экземпляры камеры, состояния объекта, конфигурации
+// света и материала, а также выбранного объекта. Новый код должен
+// импортировать соответствующие пакеты напрямую.
+//
+// Ключевые функции:
+//   InitScene()             — создание белой текстуры по умолчанию.
+//   RegisterSceneObjects()  — регистрация дополнительных объектов для выбора.
+//   SetMainObjectName()     — задание имени главного объекта.
+//   DrawScene()             — полный цикл: ввод → отрисовка → swap.
+//   GetLightingName() и др. — геттеры для UI/заголовка окна.
+//
+// Зависимости: объединяет все пакеты проекта; вызывается из main().
 package utils
 
 import (
@@ -14,36 +27,47 @@ import (
 	"github.com/venexene/comp-graphics-go/shaders"
 )
 
-// Re-exported types for backward compatibility.
+// SceneObject — реэкспорт типа для обратной совместимости.
 type SceneObject = scene.SceneObject
 
+// Глобальное состояние сцены (синглтоны).
 var (
-	defaultTex uint32
+	defaultTex uint32 // ID белой текстуры-заглушки
 
-	cam        = scene.DefaultCamera()
-	mainState  = scene.DefaultObjectState()
-	lightCfg   = lighting.DefaultLight()
-	matCfg     = lighting.DefaultMaterial()
-	sel        = scene.NewSelection("Main")
-	inputState input.State
+	cam        = scene.DefaultCamera()    // камера
+	mainState  = scene.DefaultObjectState() // трансформация главного объекта
+	lightCfg   = lighting.DefaultLight()  // конфигурация света
+	matCfg     = lighting.DefaultMaterial() // конфигурация материала
+	sel        = scene.NewSelection("Main") // состояние выбора объекта
+	inputState input.State                 // состояние клавиш (edge detection)
 )
 
-// InitScene creates the default white texture used for untextured models.
+// InitScene — инициализация сцены: создание белой текстуры 1×1.
+// Вызывается: из main() после инициализации шейдеров.
 func InitScene() {
 	defaultTex = scene.CreateWhiteTexture()
 }
 
-// RegisterSceneObjects stores extra scene objects for selection cycling.
+// RegisterSceneObjects — регистрирует дополнительные объекты для циклического
+// переключения по Tab. Вызывается: из main() после загрузки моделей.
 func RegisterSceneObjects(objs ...*SceneObject) {
 	sel.RegisterObjects(objs...)
 }
 
-// SetMainObjectName sets the display name of the primary model.
+// SetMainObjectName — задаёт отображаемое имя главной модели (снеговика).
+// Вызывается: из main().
 func SetMainObjectName(name string) {
 	sel.SetMainName(name)
 }
 
-// DrawScene processes input, clears the framebuffer and renders all objects.
+// DrawScene — полный кадр рендеринга.
+// Последовательность:
+// 1. Обработка ввода (input.ProcessInput).
+// 2. Получение текущей шейдерной программы.
+// 3. Отрисовка сцены (scene.DrawScene).
+// 4. Обработка событий GLFW (glfw.PollEvents).
+// 5. Смена буферов (SwapBuffers).
+// Вызывается: каждый кадр в главном цикле main().
 func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32.Mat4, extras ...*SceneObject) {
 	input.ProcessInput(window, &cam, &mainState, &lightCfg, sel, &inputState)
 	program := shaders.GetCurrentLightingProgram()
@@ -52,7 +76,7 @@ func DrawScene(window *glfw.Window, model *objects.Model, view, projection mgl32
 	window.SwapBuffers()
 }
 
-// Getters for UI / title bar.
+// ===== Геттеры для UI / заголовка окна =====
 
 func GetLightingName() string       { return shaders.GetCurrentLightingName() }
 func GetShadingMode() string        { return shaders.GetCurrentShadingMode().String() }

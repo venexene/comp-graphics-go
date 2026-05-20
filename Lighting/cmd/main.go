@@ -1,3 +1,19 @@
+// cmd/main.go — Точка входа в программу.
+//
+// Назначение: инициализация окна GLFW, контекста OpenGL, загрузка всех
+// 3D-моделей, настройка сцены и главный цикл рендеринга.
+//
+// Ключевые структуры: нет собственных структур; использует ObjectState,
+// SceneObject, LightConfig, Camera из пакетов scene, lighting.
+//
+// Ключевые функции:
+//   main()          — точка входа, инициализация + цикл рендера.
+//   initGlfw()      — создание окна GLFW (Core Profile 4.1).
+//   initOpenGL()    — инициализация OpenGL и компиляция шейдеров.
+//   findProjectRoot() — поиск корня проекта (файла go.mod) вверх по дереву.
+//
+// Зависимости: objects (загрузка OBJ), shaders (шейдерные программы),
+//   scene (камера, свет, отрисовка), ui (текстовый оверлей), utils (мост).
 package main
 
 import (
@@ -18,16 +34,26 @@ import (
 	"github.com/venexene/comp-graphics-go/utils"
 )
 
-// Размеры окна
+// width, height — размеры окна в пикселях (1280×720).
 const (
 	width  = 1280
 	height = 720
 )
 
+// main — точка входа. Последовательность:
+// 1. Блокировка горутины в OS-потоке (требование OpenGL).
+// 2. Поиск корня проекта (go.mod) для разрешения путей к шейдерам/моделям.
+// 3. Создание окна GLFW, инициализация OpenGL, компиляция всех шейдерных программ.
+// 4. Инициализация UI (текстовый оверлей), создание текстуры-заглушки.
+// 5. Загрузка трёх OBJ-моделей: снеговик (центр), сердце (+X), дефолт (-X).
+// 6. Включение теста глубины, настройка камеры LookAt, проекции Perspective.
+// 7. Регистрация объектов для циклического переключения (Tab).
+// 8. Главный цикл: обработка ввода → отрисовка сцены → обновление заголовка.
 func main() {
 	runtime.LockOSThread()
 
-	// Resolve project root so shaders and models are found regardless of CWD
+	// Поиск go.mod вверх от CWD — чтобы шейдеры и модели находились
+	// независимо от того, откуда запущена программа.
 	projectRoot, err := findProjectRoot()
 	if err != nil {
 		panic(fmt.Errorf("cannot find project root: %w", err))
@@ -43,15 +69,16 @@ func main() {
 	}
 	defer shaders.CleanupLightingVariants()
 
-	// Initialize UI
+	// Инициализация текстового UI.
 	if err := ui.InitializeUI(window); err != nil {
 		panic(fmt.Errorf("failed to initialize UI: %w", err))
 	}
 	defer ui.Cleanup()
 
-	// Initialize scene (textures, etc)
+	// Создание белой текстуры 1×1 для моделей без собственных текстур.
 	utils.InitScene()
 
+	// Путь к основному объекту сцены — снеговику.
 	objPath := filepath.Join(projectRoot, "models", "snowman.obj")
 	if len(os.Args) > 1 {
 		objPath = os.Args[1]
@@ -63,7 +90,7 @@ func main() {
 	}
 	defer model.Delete()
 
-	// Load additional scene objects (heart and default) placed near the snowman
+	// Дополнительные модели: сердце справа от снеговика, default слева.
 	heartModel, err := objects.LoadOBJ(filepath.Join(projectRoot, "models", "heart.obj"))
 	if err != nil {
 		panic(fmt.Errorf("failed to load heart OBJ: %w", err))
@@ -76,33 +103,33 @@ func main() {
 	}
 	defer defaultModel.Delete()
 
-	// Place models in a horizontal line with equal spacing and no rotation
-	// Increase spacing to avoid intersections with the snowman
+	// Размещение моделей в ряд вдоль оси X с шагом 4.0.
 	spacing := float32(4.0)
-	// derive friendly names from file names (strip path and extension)
+	// Извлечение имени из пути (без расширения).
 	heartName := strings.TrimSuffix(filepath.Base("models/heart.obj"), filepath.Ext("models/heart.obj"))
 	defaultName := strings.TrimSuffix(filepath.Base("models/default.obj"), filepath.Ext("models/default.obj"))
 
 	heartObj := &utils.SceneObject{Model: heartModel, Position: mgl32.Vec3{spacing, 0.0, 0.0}, Scale: 0.6, RotationZ: 0.0, Name: heartName}
 	defaultObj := &utils.SceneObject{Model: defaultModel, Position: mgl32.Vec3{-spacing, 0.0, 0.0}, Scale: 0.6, RotationZ: 0.0, Name: defaultName}
 
-	// Настройка состояния OpenGL
+	// Включение z-буфера для корректной сортировки по глубине.
 	gl.Enable(gl.DEPTH_TEST)
-	
-	// Начальная позиция камеры
+
+	// Начальная камера: смотрит на (0,0,0) из точки (5,2,5).
 	view := mgl32.LookAt(5.0, 2.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
-	// Создание projection матрицы
+	// Матрица перспективной проекции: FOV 45°, соотношение 16:9,
+	// ближняя плоскость 0.1, дальняя 100.0.
 	projection := mgl32.Perspective(mgl32.DegToRad(45.0), float32(width)/height, 0.1, 100.0)
 
 	fmt.Println("OBJ model loaded:", objPath)
 	fmt.Println("Lighting variants loaded:", shaders.GetLightingVariantCount())
 
-	// Register extras for selection and set main object name
+	// Регистрация дополнительных объектов для переключения по Tab.
 	utils.RegisterSceneObjects(heartObj, defaultObj)
 	utils.SetMainObjectName(objPath)
 
-	// Print UI overlay now that objects are registered
+	// Вывод UI-оверлея в терминал при старте.
 	fmt.Println("\n" + ui.GetUIOverlayText(
 		utils.GetLightingName,
 		utils.GetShadingMode,
@@ -114,12 +141,13 @@ func main() {
 		utils.GetAttenuationMode,
 	))
 
-	// Основной цикл рендеринга
+	// Главный цикл рендеринга.
 	for !window.ShouldClose() {
 		ui.BeginFrame()
+		// Обработка ввода + очистка буферов + отрисовка всех объектов.
 		utils.DrawScene(window, model, view, projection, heartObj, defaultObj)
-		
-		// Update window title with current state (including light position)
+
+		// Обновление заголовка окна — отображение текущего состояния сцены.
 		lx, ly, lz := utils.GetLightPosition()
 		selected := utils.GetSelectedObjectName()
 		title := fmt.Sprintf("Selected: %s | Light:(%.2f,%.2f,%.2f) | Model: %s | Shading: %s | Atten: %s | Linear: %.2f | Quad: %.2f | Ambient: %.2f",
@@ -133,46 +161,54 @@ func main() {
 			utils.GetAmbientStrength(),
 		)
 		window.SetTitle(title)
-		
+
 		ui.EndFrame()
 	}
 }
 
-// Инициализация окна GLFW
+// initGlfw — создание окна GLFW.
+// Возвращает: указатель на окно GLFW (размер 1280×720, Core Profile 4.1).
+// Побочные эффекты: инициализация GLFW, создание контекста OpenGL,
+//   контекст делается текущим для вызывающего потока.
+// Вызывается: однократно при запуске.
 func initGlfw() *glfw.Window {
-    if err := glfw.Init(); err != nil {
-        panic(err)
-    }
-    
-    glfw.WindowHint(glfw.Resizable, glfw.False)
-    glfw.WindowHint(glfw.ContextVersionMajor, 4)
-    glfw.WindowHint(glfw.ContextVersionMinor, 1)
-    glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
-    glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
+	if err := glfw.Init(); err != nil {
+		panic(err)
+	}
 
-    window, err := glfw.CreateWindow(width, height, "OBJ Viewer with Camera Controls", nil, nil)
-    if err != nil {
-        panic(err)
-    }
-    window.MakeContextCurrent()
+	glfw.WindowHint(glfw.Resizable, glfw.False)
+	glfw.WindowHint(glfw.ContextVersionMajor, 4)
+	glfw.WindowHint(glfw.ContextVersionMinor, 1)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-    return window
+	window, err := glfw.CreateWindow(width, height, "OBJ Viewer with Camera Controls", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	window.MakeContextCurrent()
+
+	return window
 }
 
-// Инициализация OpenGL
+// initOpenGL — инициализация OpenGL и компиляция шейдеров.
+// Возвращает: ошибку, если gl.Init() или компиляция шейдеров провалились.
+// Побочные эффекты: загружает функции OpenGL через gl.Init(),
+//   компилирует все 8 шейдерных программ (см. lightingVariants в shaders/lighting.go).
+// Вызывается: однократно после initGlfw().
 func initOpenGL() error {
-    if err := gl.Init(); err != nil {
-        return err
-    }
+	if err := gl.Init(); err != nil {
+		return err
+	}
 
-    version := gl.GoStr(gl.GetString(gl.VERSION))
-    log.Println("OpenGL version", version)
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	log.Println("OpenGL version", version)
 
-    if err := shaders.InitLightingVariants(); err != nil {
-        return err
-    }
+	if err := shaders.InitLightingVariants(); err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 // findProjectRoot locates the project root directory by walking up from the

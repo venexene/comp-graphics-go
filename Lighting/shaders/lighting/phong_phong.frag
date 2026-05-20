@@ -1,3 +1,10 @@
+// shaders/lighting/phong_phong.frag — Фрагментный шейдер модели Фонга (Фонг).
+//
+// Модель освещения: Phong (с отражённым вектором R).
+// Режим шейдинга: Phong — попиксельное освещение.
+// Формула: I = I_a + I_d * max(N·L, 0) + I_s * (max(V·R, 0))^sh
+// Где R = reflect(-L, N).
+
 #version 330 core
 
 in Vertex {
@@ -25,22 +32,24 @@ uniform struct PointLight {
 	vec3 diffuse;
 	vec3 specular;
     vec3 position;
-
     float constant;
     float linear;
     float quadratic;
-
     float ambient_strength;
 } light;
 
 out vec4 frag_color;
 
 void main() {
+    // Нормализация интерполированных векторов.
     vec3 norm = normalize(vert.normal);
     vec3 light_dir = normalize(vert.light_dir);
     vec3 view_dir = normalize(vert.view_dir);
+    
+    // Отражённый вектор по Фонгу: R = reflect(-L, N).
     vec3 refl_dir = reflect(-light_dir, norm);
 
+    // Затухание.
     float attenuation;
     if (attenuation_mode == 1) {
         attenuation = 1.0 / max(light.constant + (light.linear * linear_coef) * vert.distance, 0.0001);
@@ -52,9 +61,11 @@ void main() {
             (light.quadratic * quadratic_coef) * vert.distance * vert.distance, 0.0001);
     }
 
+    // Диффузное и зеркальное затенение.
     float norm_d_light = max(dot(norm, light_dir), 0.0);
     float view_d_refl = max(dot(view_dir, refl_dir), 0.0);
 
+    // Три составляющие: фоновая, диффузная, зеркальная.
     vec3 base_color = texture(diffuse_map, vert.uv_coords).rgb;
     vec3 ambient = light.ambient * base_color * material.ambient * light.ambient_strength * attenuation; 
     vec3 diffuse = light.diffuse * base_color * material.diffuse * norm_d_light * attenuation;

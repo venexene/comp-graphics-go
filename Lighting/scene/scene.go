@@ -1,3 +1,21 @@
+// scene/scene.go — Отрисовка сцены и управление uniform-переменными.
+//
+// Назначение: предоставляет функции для отрисовки всей сцены: очистка
+// буферов, активация шейдерной программы, установка всех uniform-переменных
+// (трансформации, материал, свет, текстура) для каждого объекта.
+//
+// Ключевые типы: нет собственных; использует UniformCache, LightConfig,
+//   MaterialConfig (lighting), Model (objects), ObjectState, SceneObject, Camera.
+//
+// Ключевые функции:
+//   CreateWhiteTexture()     — создаёт белую текстуру 1×1 для моделей без текстур.
+//   setTransformUniforms()   — загрузка матриц Model/View/Projection/Normal в шейдер.
+//   setMaterialUniforms()    — загрузка параметров материала в шейдер.
+//   setLightUniforms()       — загрузка параметров света в шейдер.
+//   drawObject()             — отрисовка одного объекта со всеми uniform.
+//   DrawScene()              — полная отрисовка сцены (все объекты).
+//
+// Зависимости: вызывается из utils.DrawScene().
 package scene
 
 import (
@@ -8,7 +26,12 @@ import (
 	"github.com/venexene/comp-graphics-go/objects"
 )
 
-// CreateWhiteTexture returns a 1×1 white texture for default material.
+// CreateWhiteTexture — создаёт текстуру 1×1 белого цвета.
+// Используется для моделей, у которых нет собственных текстурных координат
+// или файла текстуры. Позволяет шейдерам всегда читать из texture(diffuse_map, uv),
+// не беспокоясь о bind-е текстуры.
+// Возвращает: ID текстуры OpenGL.
+// Побочные эффекты: создаёт объект текстуры в OpenGL.
 func CreateWhiteTexture() uint32 {
 	var texture uint32
 	gl.GenTextures(1, &texture)
@@ -26,7 +49,13 @@ func CreateWhiteTexture() uint32 {
 	return texture
 }
 
-// setTransformUniforms uploads view, projection and model matrices to the shader.
+// setTransformUniforms — загружает матрицы трансформации в шейдерную программу.
+// Принимает: modelMat — модельная матрица (Model Space → World Space);
+//   view — видовая матрица (World Space → View Space);
+//   proj — матрица проекции (View Space → Clip Space);
+//   u — кэш расположений uniform-переменных.
+// Вычисляет матрицу нормалей как (M⁻¹)ᵀ, извлекает подматрицу 3×3.
+// Побочные эффекты: вызывает glUniformMatrix4fv/3fv (изменяет состояние OpenGL).
 func setTransformUniforms(modelMat mgl32.Mat4, view, proj mgl32.Mat4, u *lighting.UniformCache) {
 	if u.View != -1 {
 		gl.UniformMatrix4fv(u.View, 1, false, &view[0])
@@ -38,6 +67,7 @@ func setTransformUniforms(modelMat mgl32.Mat4, view, proj mgl32.Mat4, u *lightin
 		gl.UniformMatrix4fv(u.Model, 1, false, &modelMat[0])
 	}
 	if u.Normal != -1 {
+		// Матрица нормалей = (M⁻¹)ᵀ, где M — верхняя левая 3×3 модельной матрицы.
 		m := modelMat.Inv().Transpose()
 		normalMat := mgl32.Mat3{
 			m[0], m[1], m[2],
@@ -48,7 +78,9 @@ func setTransformUniforms(modelMat mgl32.Mat4, view, proj mgl32.Mat4, u *lightin
 	}
 }
 
-// setMaterialUniforms uploads material properties to the shader.
+// setMaterialUniforms — загружает параметры материала в шейдер.
+// Принимает: mat — конфигурация материала (цвета ambient/diffuse/specular, sheen).
+// Побочные эффекты: вызывает glUniform3f/1f для каждого поля.
 func setMaterialUniforms(mat *lighting.MaterialConfig, u *lighting.UniformCache) {
 	if u.MaterialAmbient != -1 {
 		gl.Uniform3f(u.MaterialAmbient, mat.Ambient.X(), mat.Ambient.Y(), mat.Ambient.Z())
@@ -64,7 +96,9 @@ func setMaterialUniforms(mat *lighting.MaterialConfig, u *lighting.UniformCache)
 	}
 }
 
-// setLightUniforms uploads light source parameters to the shader.
+// setLightUniforms — загружает параметры точечного источника света в шейдер.
+// Принимает: l — конфигурацию света (позиция, цвета, коэффициенты затухания).
+// Побочные эффекты: вызывает glUniform3f/1f/1i для каждого поля.
 func setLightUniforms(l *lighting.LightConfig, u *lighting.UniformCache) {
 	if u.LightAmbient != -1 {
 		gl.Uniform3f(u.LightAmbient, l.Ambient.X(), l.Ambient.Y(), l.Ambient.Z())
@@ -97,11 +131,18 @@ func setLightUniforms(l *lighting.LightConfig, u *lighting.UniformCache) {
 		gl.Uniform1f(u.QuadraticCoef, l.QuadraticCoef)
 	}
 	if u.AttenuationMode != -1 {
+		// 0 = Both, 1 = Linear, 2 = Quadratic
 		gl.Uniform1i(u.AttenuationMode, int32(l.Mode))
 	}
 }
 
-// drawObject renders a single model with its model matrix and full lighting uniforms.
+// drawObject — отрисовывает один 3D-объект.
+// Принимает: model — модель OpenGL (VAO/VBO); modelMat — её матрица трансформации;
+//   view/proj — видовую и проекционную матрицы; mat — материал; l — свет;
+//   u — кэш uniform-переменных.
+// Последовательность: трансформации → материал → свет → текстура → Draw.
+// Побочные эффекты: изменяет uniform-переменные текущей шейдерной программы,
+//   вызывает glDrawArrays.
 func drawObject(model *objects.Model, modelMat mgl32.Mat4, view, proj mgl32.Mat4,
 	mat *lighting.MaterialConfig, l *lighting.LightConfig, u *lighting.UniformCache) {
 
@@ -109,19 +150,24 @@ func drawObject(model *objects.Model, modelMat mgl32.Mat4, view, proj mgl32.Mat4
 	setMaterialUniforms(mat, u)
 	setLightUniforms(l, u)
 
-	if u.ViewPos != -1 {
-		// viewPos is set once before the loop, but re-set here to be safe
-		// (it doesn't change per object, but some shader programs may need it)
-	}
-
 	if u.DiffuseMap != -1 {
+		// Привязка сэмплера к текстурному юниту 0.
 		gl.Uniform1i(u.DiffuseMap, 0)
 	}
 
 	model.Draw()
 }
 
-// DrawScene clears the framebuffer and renders all scene objects with the given shader program.
+// DrawScene — полная отрисовка одного кадра сцены.
+// Последовательность:
+// 1. Очистка цветового буфера и z-буфера (цвет фона — тёмный сине-зелёный).
+// 2. Активация шейдерной программы (glUseProgram).
+// 3. Кэширование uniform-переменных для этой программы.
+// 4. Вычисление view-матрицы камеры.
+// 5. Установка позиции камеры (transform.view_pos).
+// 6. Бинд белой текстуры по умолчанию.
+// 7. Отрисовка главной модели (снеговик).
+// 8. Отрисовка дополнительных объектов (сердце, default).
 func DrawScene(
 	program uint32,
 	mainModel *objects.Model,
@@ -138,7 +184,7 @@ func DrawScene(
 
 	gl.UseProgram(program)
 
-	// Cache uniform locations
+	// Кэширование uniform-переменных при каждой смене шейдера.
 	var u lighting.UniformCache
 	u.Refresh(program)
 
@@ -146,19 +192,20 @@ func DrawScene(
 	eye := cam.EyePosition()
 
 	if u.ViewPos != -1 {
+		// Позиция камеры нужна для вычисления направления взгляда в зеркальных моделях.
 		gl.Uniform3f(u.ViewPos, eye.X(), eye.Y(), eye.Z())
 	}
 
-	// Activate default texture
+	// Активация белой текстуры-заглушки на текстурном юните 0.
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, defaultTex)
 
-	// Draw main model
+	// Отрисовка главной модели (снеговик).
 	if mainModel != nil {
 		drawObject(mainModel, mainState.ModelMatrix(), view, projection, matCfg, lightCfg, &u)
 	}
 
-	// Draw extra scene objects
+	// Отрисовка дополнительных сценических объектов.
 	for _, obj := range extras {
 		if obj == nil || obj.Model == nil {
 			continue

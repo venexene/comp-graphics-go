@@ -1,13 +1,24 @@
+// shaders/lighting/basic_gouraud.frag — Фрагментный шейдер для Gouraud-шейдинга.
+//
+// Назначение: принимает уже вычисленный цвет вершины (vert_color),
+// умножает его на цвет из текстуры и выводит как цвет фрагмента.
+// Используется всеми Gouraud-вариантами освещения, т.к. вся работа
+// по расчёту освещения сделана в вершинном шейдере.
+
 #version 330 core
 
+// Интерполированный цвет вершины (вычислен в вершинном шейдере).
 in vec3 vert_color;
+// Интерполированные текстурные координаты.
 in vec2 uv_coords;
 
-uniform sampler2D diffuse_map;
+uniform sampler2D diffuse_map; // диффузная текстура
 
-out vec4 frag_color;
+out vec4 frag_color; // выходной цвет фрагмента
 
 void main() {
+    // Чтение цвета из текстуры.
     vec3 base_color = texture(diffuse_map, uv_coords).rgb;
+    // Умножение текстуры на интерполированное освещение.
     frag_color = vec4(base_color * vert_color, 1.0);
 }

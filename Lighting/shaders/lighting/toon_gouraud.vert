@@ -1,3 +1,11 @@
+// shaders/lighting/toon_gouraud.vert — Вершинный шейдер Toon (Гуро).
+//
+// Модель освещения: Toon (дискретные уровни освещения + контурные края).
+// Режим шейдинга: Gouraud.
+// Особенности: диффузная составляющая квантуется на levels дискретных
+// ступеней; зеркальная — аналогично; краевые грани затемняются через
+// smoothstep на основе dot(N, V).
+
 #version 330 core
 
 layout (location = 0) in vec3 position;
@@ -24,11 +32,9 @@ uniform struct PointLight {
     vec3 diffuse;
     vec3 specular;
     vec3 position;
-
     float constant;
     float linear;
     float quadratic;
-
     float ambient_strength;
 } light;
 
@@ -50,6 +56,7 @@ void main() {
     light_dir = normalize(light_dir);
     view_dir = normalize(view_dir);
 
+    // Затухание.
     float attenuation;
     if (attenuation_mode == 1) {
         attenuation = 1.0 / max(light.constant + (light.linear * linear_coef) * distance, 0.0001);
@@ -61,21 +68,22 @@ void main() {
             (light.quadratic * quadratic_coef) * distance * distance, 0.0001);
     }
 
-    // Diffuse: discrete levels
+    // Диффузное: дискретные уровни (3 ступени).
     float diff = max(dot(normal, light_dir), 0.0);
     float levels = 3.0;
     float toon_diff = floor(diff * levels) / levels;
     toon_diff = max(toon_diff, light.ambient_strength);
 
-    // Specular: discrete highlight (Blinn-Phong half-vector approach)
+    // Зеркальное: дискретный блик (через половинный вектор).
     vec3 half_dir = normalize(light_dir + view_dir);
     float spec = pow(max(dot(normal, half_dir), 0.0), material.sheen_coef);
     float toon_spec = floor(spec * levels) / levels;
 
-    // Silhouette edge: darken near grazing angles
+    // Контурные края: затемнение при dot(N,V) → 0.
     float edge = dot(normal, view_dir);
     float edge_factor = smoothstep(0.15, 0.05, edge);
 
+    // Итоговый цвет.
     vec3 base_color = texture(diffuse_map, uv_coords_in).rgb;
     vec3 ambient = light.ambient * base_color * light.ambient_strength * attenuation;
     vec3 diffuse = light.diffuse * base_color * toon_diff * attenuation;

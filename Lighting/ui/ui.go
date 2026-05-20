@@ -1,38 +1,62 @@
+// ui/ui.go — Текстовый интерфейс пользователя (оверлей).
+//
+// Назначение: предоставляет простой текстовый UI в виде ASCII-панели,
+// выводимой в терминал при старте, и обновляет заголовок окна в реальном
+// времени. Не использует графические UI-библиотеки (Dear ImGui и т.п.).
+//
+// Ключевые типы:
+//   LightingControlState — состояние UI (показ/скрытие панели).
+//
+// Ключевые функции:
+//   InitializeUI()       — инициализация UI (no-op для текстового режима).
+//   BeginFrame()         — начало кадра (no-op).
+//   EndFrame()           — конец кадра (no-op).
+//   Cleanup()            — освобождение ресурсов (no-op).
+//   GetUIOverlayText()   — формирует ASCII-панель с текущими параметрами.
+//
+// Зависимости: вызывается из main() при инициализации и для получения текста.
 package ui
 
 import (
 	"fmt"
 )
 
-// LightingControlState holds UI state
+// LightingControlState — состояние панели управления освещением.
 type LightingControlState struct {
-	ShowPanel bool
+	ShowPanel bool // видимость панели (в будущем для переключения)
 }
 
 var state = LightingControlState{ShowPanel: true}
 
-// InitializeUI initializes the UI system
+// InitializeUI — инициализирует UI-систему.
+// В текущей реализации UI — текстовый, выводится в терминал.
 func InitializeUI(window interface{}) error {
-	// UI is rendered as text overlay via window title
 	return nil
 }
 
-// BeginFrame starts a new UI frame
-func BeginFrame() {
-	// No-op for text-based UI
-}
+// BeginFrame — начало нового кадра UI.
+// No-op для текстового UI.
+func BeginFrame() {}
 
-// EndFrame ends the UI frame
-func EndFrame() {
-	// No-op for text-based UI
-}
+// EndFrame — завершение кадра UI.
+// No-op для текстового UI.
+func EndFrame() {}
 
-// Cleanup releases UI resources
-func Cleanup() {
-	// No-op for text-based UI
-}
+// Cleanup — освобождает ресурсы UI.
+// No-op для текстового UI.
+func Cleanup() {}
 
-// GetUIOverlayText returns the text to render as UI overlay
+// GetUIOverlayText — формирует строку с ASCII-панелью управления.
+// Принимает функции-геттеры для получения текущих значений:
+//   getLightingName — название модели освещения;
+//   getShadingMode — режим шейдинга (Gouraud/Phong);
+//   getLinearCoef — линейный коэффициент затухания;
+//   getQuadraticCoef — квадратичный коэффициент затухания;
+//   getAmbientStrength — мощность фонового освещения;
+//   getLightPosition — позиция источника света;
+//   getSelectedObjectName — имя выбранного объекта;
+//   getAttenuationMode — режим затухания (Both/Linear/Quadratic).
+// Возвращает: строку с отформатированной ASCII-таблицей.
 func GetUIOverlayText(
 	getLightingName func() string,
 	getShadingMode func() string,

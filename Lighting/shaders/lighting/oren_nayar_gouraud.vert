@@ -1,3 +1,11 @@
+// shaders/lighting/oren_nayar_gouraud.vert — Вершинный шейдер Орен-Наяра (Гуро).
+//
+// Модель освещения: Oren-Nayar (диффузное отражение шероховатых поверхностей).
+// Режим шейдинга: Gouraud.
+// Формула: I = I_a + I_d * ρ * max(N·L, 0) * (A + B * max(0, cos(Δφ)) * sin(α) * tan(β))
+// Где A и B зависят от roughness (σ), α = max(θ_i, θ_r), β = min(θ_i, θ_r).
+// Это улучшение Ламберта для матовых/шероховатых поверхностей.
+
 #version 330 core
 
 layout (location = 0) in vec3 position;
@@ -16,16 +24,14 @@ uniform struct PointLight {
     vec3 ambient;
     vec3 diffuse;
     vec3 position;
-
     float constant;
     float linear;
     float quadratic;
-
     float ambient_strength;
 } light;
 
 uniform sampler2D diffuse_map;
-uniform float roughness;
+uniform float roughness;          // шероховатость поверхности σ [0, ∞)
 uniform float linear_coef;
 uniform float quadratic_coef;
 
@@ -43,20 +49,25 @@ void main() {
     light_dir = normalize(light_dir);
     view_dir = normalize(view_dir);
 
+    // Затухание (всегда оба коэффициента для Oren-Nayar).
     float attenuation = 1.0 / max(light.constant + 
         (light.linear * linear_coef) * distance + 
         (light.quadratic * quadratic_coef) * distance * distance, 0.0001);
 
+    // Угол падения и угол обзора.
     float norm_d_light = max(dot(normal, light_dir), 0.0);
     float norm_d_view = max(dot(normal, view_dir), 0.0);
 
+    // Коэффициенты A и B по модели Oren-Nayar.
     float rough2 = roughness * roughness;
     float A = 1.0 - (0.5 * rough2 / (rough2 + 0.33));
     float B = 0.45 * rough2 / (rough2 + 0.09);
 
+    // sin углов для вычисления α и β.
     float sin_theta_i = sqrt(1.0 - norm_d_light * norm_d_light);
     float sin_theta_r = sqrt(1.0 - norm_d_view * norm_d_view);
 
+    // Азимутальная разница max_cos = max(0, cos(Δφ)).
     float max_cos = 0.0;
     if (sin_theta_i > 0.0001 && sin_theta_r > 0.0001) {
         vec3 light_perp = normalize(light_dir - normal * norm_d_light);
@@ -64,6 +75,7 @@ void main() {
         max_cos = max(0.0, dot(light_perp, view_perp));
     }
 
+    // α = max(θ_i, θ_r), β = min(θ_i, θ_r).
     float sin_alpha, tan_beta;
     if (norm_d_light > norm_d_view) {
         sin_alpha = sin_theta_r;
@@ -74,7 +86,10 @@ void main() {
         tan_beta  = sin_theta_r / max(norm_d_view, 0.001);
     }
 
+    // Итоговое диффузное затенение по Oren-Nayar.
     float oren_nayar = norm_d_light * (A + B * max_cos * sin_alpha * tan_beta) * attenuation;
+    
+    // Итоговый цвет (без зеркальной составляющей).
     vec3 base_color = texture(diffuse_map, uv_coords_in).rgb;
     vec3 ambient = light.ambient * base_color * light.ambient_strength * attenuation;
 
