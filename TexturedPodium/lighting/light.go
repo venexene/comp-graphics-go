@@ -1,4 +1,3 @@
-
 // Пакет lighting содержит структуры для работы с освещением и материалами:
 // LightConfig — точечный источник света с настраиваемым затуханием,
 // MaterialConfig — поверхностные свойства материала,
@@ -11,7 +10,7 @@ import "github.com/go-gl/mathgl/mgl32"
 type AttenuationMode int
 
 const (
-	AttenuationBoth     AttenuationMode = iota
+	AttenuationBoth AttenuationMode = iota
 	AttenuationLinear
 	AttenuationQuadratic
 )

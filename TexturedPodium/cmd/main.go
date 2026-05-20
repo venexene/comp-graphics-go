@@ -29,7 +29,6 @@ const (
 func main() {
 	runtime.LockOSThread()
 
-	
 	projectRoot, err := findProjectRoot()
 	if err != nil {
 		panic(fmt.Errorf("cannot find project root: %w", err))
@@ -45,22 +44,18 @@ func main() {
 	}
 	defer shaders.CleanupLightingVariants()
 
-	
 	if err := ui.InitializeUI(window); err != nil {
 		panic(fmt.Errorf("failed to initialize UI: %w", err))
 	}
 	defer ui.Cleanup()
 
-	
 	if err := utils.InitScene(projectRoot); err != nil {
 		panic(fmt.Errorf("failed to init scene: %w", err))
 	}
 	defer utils.Cleanup()
 
-	
 	gl.Enable(gl.DEPTH_TEST)
 
-	
 	projection := mgl32.Perspective(mgl32.DegToRad(45.0), float32(width)/height, 0.1, 100.0)
 
 	fmt.Println("Winner's podium with multi-texturing")
@@ -78,7 +73,6 @@ func main() {
 		utils.GetNumberWeight,
 	))
 
-	
 	for !window.ShouldClose() {
 		ui.BeginFrame()
 		utils.DrawScene(window, projection)
@@ -102,48 +96,47 @@ func main() {
 }
 
 func initGlfw() *glfw.Window {
-    if err := glfw.Init(); err != nil {
-        panic(err)
-    }
-    
-    glfw.WindowHint(glfw.Resizable, glfw.False)
-    glfw.WindowHint(glfw.ContextVersionMajor, 4)
-    glfw.WindowHint(glfw.ContextVersionMinor, 1)
-    glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
-    glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
+	if err := glfw.Init(); err != nil {
+		panic(err)
+	}
 
-    window, err := glfw.CreateWindow(width, height, "Winner's Podium", nil, nil)
-    if err != nil {
-        panic(err)
-    }
-    window.MakeContextCurrent()
+	glfw.WindowHint(glfw.Resizable, glfw.False)
+	glfw.WindowHint(glfw.ContextVersionMajor, 4)
+	glfw.WindowHint(glfw.ContextVersionMinor, 1)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-    return window
+	window, err := glfw.CreateWindow(width, height, "Winner's Podium", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	window.MakeContextCurrent()
+
+	return window
 }
 
 func initOpenGL() error {
-    if err := gl.Init(); err != nil {
-        return err
-    }
+	if err := gl.Init(); err != nil {
+		return err
+	}
 
-    version := gl.GoStr(gl.GetString(gl.VERSION))
-    log.Println("OpenGL version", version)
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	log.Println("OpenGL version", version)
 
-    if err := shaders.InitLightingVariants(); err != nil {
-        return err
-    }
+	if err := shaders.InitLightingVariants(); err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 func findProjectRoot() (string, error) {
-	
+
 	dir := "."
 	if exe, err := os.Executable(); err == nil {
 		dir = filepath.Dir(exe)
 	}
 
-	
 	for {
 		modPath := filepath.Join(dir, "go.mod")
 		if _, err := os.Stat(modPath); err == nil {
@@ -151,13 +144,12 @@ func findProjectRoot() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			
+
 			break
 		}
 		dir = parent
 	}
 
-	
 	if cwd, err := os.Getwd(); err == nil {
 		dir = cwd
 		for {

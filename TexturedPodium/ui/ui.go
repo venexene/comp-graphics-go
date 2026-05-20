@@ -15,20 +15,20 @@ type LightingControlState struct {
 var state = LightingControlState{ShowPanel: true}
 
 func InitializeUI(window interface{}) error {
-	
+
 	return nil
 }
 
 func BeginFrame() {
-	
+
 }
 
 func EndFrame() {
-	
+
 }
 
 func Cleanup() {
-	
+
 }
 
 func GetUIOverlayText(

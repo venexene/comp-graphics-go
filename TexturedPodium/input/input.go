@@ -1,4 +1,3 @@
-
 // Пакет input обрабатывает клавиатурный ввод: управление камерой (стрелки,
 // WASD, Space/Shift, +/-), перемещение источника света (Alt+IJKLUO),
 // переключение моделей освещения (T/G) и шейдинга (Y), регулировка
@@ -38,7 +37,7 @@ func ProcessInput(
 	sel *scene.Selection,
 	inputState *State,
 ) {
-	
+
 	if window.GetKey(glfw.KeyUp) == glfw.Press {
 		cam.Rotate(0, -CameraRotateSpeed)
 	}
@@ -52,7 +51,6 @@ func ProcessInput(
 		cam.Rotate(CameraRotateSpeed, 0)
 	}
 
-	
 	if window.GetKey(glfw.KeyW) == glfw.Press {
 		cam.PanForward(-CameraPanSpeed)
 	}
@@ -72,7 +70,6 @@ func ProcessInput(
 		cam.PanUp(-CameraPanSpeed)
 	}
 
-	
 	if window.GetKey(glfw.KeyKPAdd) == glfw.Press || window.GetKey(glfw.KeyEqual) == glfw.Press {
 		cam.Zoom(-CameraZoomSpeed, 1.0, 50.0)
 	}
@@ -80,7 +77,6 @@ func ProcessInput(
 		cam.Zoom(CameraZoomSpeed, 1.0, 50.0)
 	}
 
-	
 	if window.GetKey(glfw.KeyQ) == glfw.Press {
 		mainState.Scale -= ObjectScaleSpeed
 		if mainState.Scale < 0.1 {
@@ -94,7 +90,6 @@ func ProcessInput(
 		}
 	}
 
-	
 	if window.GetKey(glfw.KeyR) == glfw.Press {
 		mainState.RotationZ += 0.001
 	}
@@ -102,7 +97,6 @@ func ProcessInput(
 		mainState.RotationZ -= 0.001
 	}
 
-	
 	if window.GetKey(glfw.Key1) == glfw.Press {
 		mainState.RotationX += 0.001
 	}
@@ -116,7 +110,6 @@ func ProcessInput(
 		mainState.RotationY -= 0.001
 	}
 
-	
 	altDown := window.GetKey(glfw.KeyLeftAlt) == glfw.Press || window.GetKey(glfw.KeyRightAlt) == glfw.Press
 
 	if altDown {
@@ -180,7 +173,6 @@ func ProcessInput(
 		}
 	}
 
-	
 	currentT := window.GetKey(glfw.KeyT) == glfw.Press
 	currentG := window.GetKey(glfw.KeyG) == glfw.Press
 	currentY := window.GetKey(glfw.KeyY) == glfw.Press
@@ -211,7 +203,6 @@ func ProcessInput(
 	inputState.lastTab = currentTab
 	inputState.lastM = currentM
 
-	
 	if window.GetKey(glfw.KeyZ) == glfw.Press {
 		lightCfg.LinearCoef -= ParamAdjustSpeed
 		if lightCfg.LinearCoef < 0.0 {
@@ -231,7 +222,6 @@ func ProcessInput(
 		lightCfg.QuadraticCoef += ParamAdjustSpeed
 	}
 
-	
 	if window.GetKey(glfw.KeyB) == glfw.Press {
 		lightCfg.AmbientStrength -= ParamAdjustSpeed
 		if lightCfg.AmbientStrength < 0.0 {
@@ -245,7 +235,6 @@ func ProcessInput(
 		}
 	}
 
-	
 	if window.GetKey(glfw.Key5) == glfw.Press {
 		lightCfg.MaterialWeight -= ParamAdjustSpeed
 		if lightCfg.MaterialWeight < 0.0 {
@@ -271,7 +260,6 @@ func ProcessInput(
 		}
 	}
 
-	
 	if window.GetKey(glfw.KeyR) == glfw.Press &&
 		window.GetKey(glfw.KeyLeftControl) == glfw.Press {
 		*mainState = scene.DefaultObjectState()

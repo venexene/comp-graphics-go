@@ -35,10 +35,10 @@ type UniformCache struct {
 	LightQuadratic int32 // light.quadratic
 
 	// Пользовательские коэффициенты (отдельные uniform)
-	AmbientStrength  int32 // light.ambient_strength — множитель фонового света
-	LinearCoef       int32 // linear_coef — множитель линейного затухания
-	QuadraticCoef    int32 // quadratic_coef — множитель квадратичного затухания
-	AttenuationMode  int32 // attenuation_mode — тип затухания (0=Both, 1=Linear, 2=Quad)
+	AmbientStrength int32 // light.ambient_strength — множитель фонового света
+	LinearCoef      int32 // linear_coef — множитель линейного затухания
+	QuadraticCoef   int32 // quadratic_coef — множитель квадратичного затухания
+	AttenuationMode int32 // attenuation_mode — тип затухания (0=Both, 1=Linear, 2=Quad)
 
 	// Мультитекстурирование
 	MaterialMap    int32 // u_materialTexture — сэмплер материала (GL_TEXTURE0)

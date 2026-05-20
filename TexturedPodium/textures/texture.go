@@ -37,7 +37,6 @@ func LoadTexture(filepath string) (uint32, error) {
 		return 0, fmt.Errorf("cannot decode texture %s: %w", filepath, err)
 	}
 
-	
 	rgba := image.NewRGBA(img.Bounds())
 	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Src)
 

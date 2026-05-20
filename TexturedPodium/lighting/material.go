@@ -26,8 +26,8 @@ type MaterialConfig struct {
 	Ambient   mgl32.Vec3
 	Diffuse   mgl32.Vec3
 	Specular  mgl32.Vec3
-	SheenCoef float32 
-	Roughness float32 
+	SheenCoef float32
+	Roughness float32
 }
 
 // DefaultMaterial возвращает MaterialConfig с нейтральными значениями.

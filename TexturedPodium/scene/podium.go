@@ -20,9 +20,9 @@ type PodiumCube struct {
 	Model       *objects.Model
 	Position    mgl32.Vec3
 	Scale       float32
-	NumberTexID uint32    
-	MatTexID    uint32    
-	Color       mgl32.Vec3 
+	NumberTexID uint32
+	MatTexID    uint32
+	Color       mgl32.Vec3
 }
 
 // ModelMatrix возвращает матрицу Model = Translate(Position) * Scale(Scale).
@@ -39,9 +39,9 @@ func (c *PodiumCube) ModelMatrix() mgl32.Mat4 {
 // HeartCol — цвет сердца (красный).
 type Podium struct {
 	Cubes    [4]PodiumCube
-	Heart    *objects.Model 
-	HeartTex uint32         
-	HeartCol mgl32.Vec3     
+	Heart    *objects.Model
+	HeartTex uint32
+	HeartCol mgl32.Vec3
 }
 
 // NewPodium создаёт пьедестал из 4 кубиков.
